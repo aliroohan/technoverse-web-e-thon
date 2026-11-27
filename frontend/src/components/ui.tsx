@@ -220,7 +220,7 @@ export function Dialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div className="dialog-root">
       <button type="button" className="dialog-backdrop" aria-label="Close" onClick={onClose} />
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -232,7 +232,8 @@ export function Dialog({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -256,7 +257,7 @@ export function Drawer({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div className="sheet-root">
       <button type="button" className="sheet-backdrop" aria-label="Close" onClick={onClose} />
       <aside className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -269,7 +270,8 @@ export function Drawer({
         <div className="sheet-body">{children}</div>
         {footer && <footer className="sheet-foot">{footer}</footer>}
       </aside>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
