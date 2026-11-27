@@ -25,7 +25,7 @@ export function AdminUsersPage() {
       notifySuccess('Account created.')
       await queryClient.invalidateQueries({ queryKey: ['users'] })
     },
-    onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
+    onError: (error: Error) => notifyError(error.message),
   })
 
   const update = useMutation({

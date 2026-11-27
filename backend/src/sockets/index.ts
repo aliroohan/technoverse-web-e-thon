@@ -2,7 +2,7 @@ import type { Server as HttpServer } from 'node:http'
 import { Server } from 'socket.io'
 import { env } from '../config/index.js'
 import { readSession } from '../services/auth.service.js'
-import { recordIncident } from '../services/attempt.service.js'
+import { recordIncident, releaseAttemptSession } from '../services/attempt.service.js'
 import { logger } from '../utils/logger.js'
 
 const cookieValue = (header: string | undefined, name: string) => {
@@ -26,6 +26,8 @@ export const createSocketServer = (httpServer: HttpServer) => {
       const session = readSession(token)
       socket.data.userId = session.sub
       socket.data.role = session.role
+      socket.data.sessionToken =
+        typeof socket.handshake.auth?.sessionToken === 'string' ? socket.handshake.auth.sessionToken : undefined
       next()
     } catch (error) {
       next(error instanceof Error ? error : new Error('Unauthorized'))
@@ -53,11 +55,11 @@ export const createSocketServer = (httpServer: HttpServer) => {
     socket.on('disconnect', () => {
       logger.debug('Socket disconnected', { socketId: socket.id })
       if (socket.data.role === 'candidate' && typeof socket.data.attemptId === 'string') {
-        void recordIncident(
-          { id: socket.data.userId as string, role: 'candidate', name: '', email: '' },
-          socket.data.attemptId,
-          'disconnect',
-        ).catch(() => undefined)
+        const user = { id: socket.data.userId as string, role: 'candidate' as const, name: '', email: '' }
+        void recordIncident(user, socket.data.attemptId, 'disconnect').catch(() => undefined)
+        if (typeof socket.data.sessionToken === 'string') {
+          void releaseAttemptSession(user, socket.data.attemptId, socket.data.sessionToken).catch(() => undefined)
+        }
       }
     })
   })

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, it, mock } from 'node:test'
 import { Answer, Attempt, Exam, ReportVerification } from '../models/index.js'
-import { recordIncident, saveAnswer, saveScratchpad } from './attempt.service.js'
+import { getAttemptView, recordIncident, saveAnswer, saveScratchpad } from './attempt.service.js'
 import { gradeWritten, issueCode } from './grading.service.js'
 import { verifyReport } from './report.service.js'
 
@@ -127,6 +127,25 @@ describe('attempt and grading safety guards', () => {
     await assert.rejects(
       () => verifyReport('unknown99'),
       (err: Error & { status?: number }) => err.status === 404,
+    )
+  })
+
+  it('rejects opening the same in-progress attempt from a second tab or device', async () => {
+    mock.method(Attempt, 'findById', async () => ({
+      _id: 'att-1',
+      id: 'att-1',
+      candidateId: { toString: () => 'cand-1' },
+      examId: { toString: () => 'exam-1' },
+      isSandbox: false,
+      status: 'in_progress',
+      deadlineAt: new Date(Date.now() + 60_000),
+      activeSessionToken: 'tab-1',
+      activeSessionAt: new Date(),
+    }))
+
+    await assert.rejects(
+      () => getAttemptView(candidateUser, 'att-1', 'tab-2'),
+      (err: Error & { status?: number }) => err.status === 409,
     )
   })
 })

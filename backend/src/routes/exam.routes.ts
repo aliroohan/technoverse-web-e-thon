@@ -5,6 +5,7 @@ import {
   getAttemptView,
   heartbeat,
   recordIncident,
+  releaseAttemptSession,
   saveAnswer,
   saveScratchpad,
   startCandidateAttempt,
@@ -249,6 +250,11 @@ examRouter.get(
   }),
 )
 
+const attemptSessionOf = (req: { headers: Record<string, unknown> }) => {
+  const header = req.headers['x-attempt-session']
+  return typeof header === 'string' && header.length > 0 ? header.slice(0, 128) : undefined
+}
+
 export const attemptRouter = Router()
 attemptRouter.use(requireUser)
 
@@ -256,14 +262,20 @@ attemptRouter.post(
   '/start/:examId',
   requireRole('candidate'),
   asyncHandler(async (req, res) => {
-    res.status(201).json({ success: true, data: await startCandidateAttempt(asAuthed(req).user, String(req.params.examId)) })
+    res.status(201).json({
+      success: true,
+      data: await startCandidateAttempt(asAuthed(req).user, String(req.params.examId), attemptSessionOf(req)),
+    })
   }),
 )
 
 attemptRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    res.json({ success: true, data: await getAttemptView(asAuthed(req).user, String(req.params.id)) })
+    res.json({
+      success: true,
+      data: await getAttemptView(asAuthed(req).user, String(req.params.id), attemptSessionOf(req)),
+    })
   }),
 )
 
@@ -277,21 +289,41 @@ attemptRouter.put(
       flaggedForReview: z.boolean().optional(),
       expectedVersion: z.number().int().min(0).optional(),
     }).parse(req.body)
-    res.json({ success: true, data: await saveAnswer(asAuthed(req).user, String(req.params.id), body) })
+    res.json({
+      success: true,
+      data: await saveAnswer(asAuthed(req).user, String(req.params.id), body, attemptSessionOf(req)),
+    })
   }),
 )
 
 attemptRouter.post(
   '/:id/submit',
   asyncHandler(async (req, res) => {
-    res.json({ success: true, data: await submitAttempt(asAuthed(req).user, String(req.params.id)) })
+    res.json({
+      success: true,
+      data: await submitAttempt(asAuthed(req).user, String(req.params.id), attemptSessionOf(req)),
+    })
   }),
 )
 
 attemptRouter.post(
   '/:id/heartbeat',
   asyncHandler(async (req, res) => {
-    res.json({ success: true, data: await heartbeat(asAuthed(req).user, String(req.params.id)) })
+    res.json({
+      success: true,
+      data: await heartbeat(asAuthed(req).user, String(req.params.id), attemptSessionOf(req)),
+    })
+  }),
+)
+
+attemptRouter.post(
+  '/:id/release',
+  asyncHandler(async (req, res) => {
+    const bodyToken = typeof req.body?.sessionToken === 'string' ? req.body.sessionToken : undefined
+    res.json({
+      success: true,
+      data: await releaseAttemptSession(asAuthed(req).user, String(req.params.id), attemptSessionOf(req) ?? bodyToken),
+    })
   }),
 )
 
@@ -299,7 +331,10 @@ attemptRouter.put(
   '/:id/scratchpad',
   asyncHandler(async (req, res) => {
     const body = z.object({ text: z.string().max(20000) }).parse(req.body)
-    res.json({ success: true, data: await saveScratchpad(asAuthed(req).user, String(req.params.id), body.text) })
+    res.json({
+      success: true,
+      data: await saveScratchpad(asAuthed(req).user, String(req.params.id), body.text, attemptSessionOf(req)),
+    })
   }),
 )
 

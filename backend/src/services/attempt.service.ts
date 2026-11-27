@@ -11,6 +11,63 @@ import { buildSnapshots } from './paper.js'
 import { toCandidateQuestion } from './serializers.js'
 
 const finalized = new Set(['submitted', 'expired', 'graded'])
+const SESSION_LEASE_MS = 45_000
+
+const claimAttemptSession = async (
+  attempt: {
+    _id: unknown
+    id?: string
+    candidateId: { toString(): string }
+    isSandbox?: boolean
+    status: string
+    activeSessionToken?: string | null
+    activeSessionAt?: Date | null
+  },
+  user: SessionUser,
+  sessionToken?: string,
+) => {
+  if (user.role !== 'candidate' || attempt.isSandbox || attempt.status !== 'in_progress') return
+  if (attempt.candidateId.toString() !== user.id) return
+
+  const cutoff = new Date(Date.now() - SESSION_LEASE_MS)
+  const existingToken = attempt.activeSessionToken ?? null
+  const existingAt = attempt.activeSessionAt ? new Date(attempt.activeSessionAt) : null
+  const isLockedByOther =
+    existingToken !== null &&
+    existingToken !== sessionToken &&
+    existingAt !== null &&
+    existingAt.getTime() > cutoff.getTime()
+
+  if (isLockedByOther) {
+    throw new HttpError(
+      409,
+      'This examination is already open in another tab or device. Close the other session to continue here.',
+    )
+  }
+
+  if (!sessionToken) return
+
+  const claimed = await Attempt.findOneAndUpdate(
+    {
+      _id: attempt._id,
+      status: 'in_progress',
+      $or: [
+        { activeSessionToken: null },
+        { activeSessionToken: { $exists: false } },
+        { activeSessionToken: sessionToken },
+        { activeSessionAt: { $lte: cutoff } },
+      ],
+    },
+    { $set: { activeSessionToken: sessionToken, activeSessionAt: new Date() } },
+    { returnDocument: 'after' },
+  )
+  if (!claimed) {
+    throw new HttpError(
+      409,
+      'This examination is already open in another tab or device. Close the other session to continue here.',
+    )
+  }
+}
 
 const cacheDeadline = async (attemptId: string, deadlineAt: Date) => {
   const ttl = Math.max(60, Math.ceil((deadlineAt.getTime() - Date.now()) / 1000) + 3600)
@@ -59,6 +116,8 @@ export const finalizeAttempt = async (attemptId: string, reason: 'submit' | 'exp
         objectiveScore,
         writtenScore: 0,
         totalScore: objectiveScore,
+        activeSessionToken: null,
+        activeSessionAt: null,
       },
     },
     { returnDocument: 'after' },
@@ -129,17 +188,18 @@ const presentAttempt = async (attempt: NonNullable<Awaited<ReturnType<typeof own
   }
 }
 
-export const getAttemptView = async (user: SessionUser, attemptId: string) => {
+export const getAttemptView = async (user: SessionUser, attemptId: string, sessionToken?: string) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.status === 'in_progress' && isPastDeadline(attempt.deadlineAt)) {
     const finalizedAttempt = await finalizeAttempt(attempt.id, 'expired')
     if (!finalizedAttempt) throw new HttpError(404, 'Attempt not found')
     return presentAttempt(finalizedAttempt, user)
   }
+  await claimAttemptSession(attempt, user, sessionToken)
   return presentAttempt(attempt, user)
 }
 
-export const startCandidateAttempt = async (user: SessionUser, examId: string) => {
+export const startCandidateAttempt = async (user: SessionUser, examId: string, sessionToken?: string) => {
   if (user.role !== 'candidate') throw new HttpError(403, 'Only candidates can sit an examination')
   const exam = await Exam.findById(examId)
   if (!exam || exam.publication !== 'published') throw new HttpError(404, 'Examination not found')
@@ -154,6 +214,7 @@ export const startCandidateAttempt = async (user: SessionUser, examId: string) =
       if (!finalizedAttempt) throw new HttpError(404, 'Attempt not found')
       return presentAttempt(finalizedAttempt, user)
     }
+    await claimAttemptSession(existing, user, sessionToken)
     return presentAttempt(existing, user)
   }
 
@@ -171,6 +232,8 @@ export const startCandidateAttempt = async (user: SessionUser, examId: string) =
     startedAt,
     deadlineAt,
     questionSnapshots: snapshots,
+    activeSessionToken: sessionToken ?? null,
+    activeSessionAt: sessionToken ? new Date() : null,
   })
   await cacheDeadline(attempt.id, deadlineAt)
   return presentAttempt(attempt, user)
@@ -203,6 +266,7 @@ export const saveAnswer = async (
     flaggedForReview?: boolean
     expectedVersion?: number
   },
+  sessionToken?: string,
 ) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.candidateId.toString() !== user.id) {
@@ -213,6 +277,7 @@ export const saveAnswer = async (
     await finalizeAttempt(attempt.id, 'expired')
     throw new HttpError(409, 'The deadline has passed. This answer was not accepted.')
   }
+  await claimAttemptSession(attempt, user, sessionToken)
 
   const snapshot = attempt.questionSnapshots.find((item) => item.questionId === input.questionId)
   if (!snapshot) throw new HttpError(404, 'That question is not on this attempt')
@@ -282,20 +347,23 @@ export const saveAnswer = async (
   }
 }
 
-export const submitAttempt = async (user: SessionUser, attemptId: string) => {
+export const submitAttempt = async (user: SessionUser, attemptId: string, sessionToken?: string) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.candidateId.toString() !== user.id) throw new HttpError(403, 'Only the sitting candidate can submit')
   if (attempt.status !== 'in_progress') return presentAttempt(attempt, user)
+  await claimAttemptSession(attempt, user, sessionToken)
   const reason = isPastDeadline(attempt.deadlineAt) ? 'expired' : 'submit'
   const finalizedAttempt = await finalizeAttempt(attempt.id, reason)
   if (!finalizedAttempt) throw new HttpError(404, 'Attempt not found')
   return presentAttempt(finalizedAttempt, user)
 }
 
-export const heartbeat = async (user: SessionUser, attemptId: string) => {
+export const heartbeat = async (user: SessionUser, attemptId: string, sessionToken?: string) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.status === 'in_progress' && isPastDeadline(attempt.deadlineAt)) {
     await finalizeAttempt(attempt.id, 'expired')
+  } else {
+    await claimAttemptSession(attempt, user, sessionToken)
   }
   const fresh = await Attempt.findById(attemptId)
   if (fresh?.status === 'in_progress') {
@@ -308,7 +376,7 @@ export const heartbeat = async (user: SessionUser, attemptId: string) => {
   }
 }
 
-export const saveScratchpad = async (user: SessionUser, attemptId: string, text: string) => {
+export const saveScratchpad = async (user: SessionUser, attemptId: string, text: string, sessionToken?: string) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.candidateId.toString() !== user.id) throw new HttpError(403, 'Only the sitting candidate can use the scratchpad')
   if (attempt.status !== 'in_progress') throw new HttpError(409, 'This attempt is already finalized')
@@ -316,12 +384,22 @@ export const saveScratchpad = async (user: SessionUser, attemptId: string, text:
     await finalizeAttempt(attempt.id, 'expired')
     throw new HttpError(409, 'The deadline has passed. Scratchpad cannot be updated.')
   }
+  await claimAttemptSession(attempt, user, sessionToken)
   await Scratchpad.findOneAndUpdate(
     { attemptId },
     { $set: { text, updatedAt: new Date() } },
     { upsert: true },
   )
   return { text }
+}
+
+export const releaseAttemptSession = async (user: SessionUser, attemptId: string, sessionToken?: string) => {
+  if (!sessionToken) return { released: false }
+  await Attempt.updateOne(
+    { _id: attemptId, candidateId: user.id, activeSessionToken: sessionToken },
+    { $set: { activeSessionToken: null, activeSessionAt: null } },
+  )
+  return { released: true }
 }
 
 export const recordIncident = async (
