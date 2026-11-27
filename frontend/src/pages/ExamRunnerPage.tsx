@@ -112,6 +112,7 @@ function Runner({
         const saved = await apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
           method: 'PUT',
           body: JSON.stringify(item),
+          silent: true,
         })
         setAnswers((prev) => {
           const cur = prev[saved.questionId]
@@ -153,6 +154,7 @@ function Runner({
     const beat = window.setInterval(() => {
       void apiRequest<{ serverNow: string; deadlineAt: string; status: AttemptView['status'] }>(`/attempts/${attempt.id}/heartbeat`, {
         method: 'POST',
+        silent: true,
       })
         .then((pulse) => {
           setOffset(new Date(pulse.serverNow).getTime() - Date.now())
@@ -186,10 +188,10 @@ function Runner({
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }), silent: true })
       }
       if (document.visibilityState === 'visible' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }), silent: true })
       }
     }
     document.addEventListener('visibilitychange', onHide)
@@ -214,6 +216,7 @@ function Runner({
       void apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
         method: 'PUT',
         body: JSON.stringify(payload),
+        silent: true,
       })
         .then((saved) => {
           setSaveState('saved')
@@ -233,6 +236,7 @@ function Runner({
             void apiRequest(`/attempts/${attempt.id}/incidents`, {
               method: 'POST',
               body: JSON.stringify({ type: 'autosave_failed' }),
+              silent: true,
             }).catch(() => undefined)
           }
         })
@@ -469,7 +473,7 @@ function Runner({
               setScratchError('')
               window.clearTimeout(timers.current.scratch)
               timers.current.scratch = window.setTimeout(() => {
-                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }) })
+                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }), silent: true })
                   .catch((error: Error) => {
                     setScratchError(error.message || 'Could not save scratchpad')
                   })

@@ -26,22 +26,22 @@ export function QuestionBankPage() {
   const remove = useMutation({
     mutationFn: (id: string) => apiRequest(`/questions/${id}`, { method: 'DELETE' }),
     onSuccess: async () => {
-      setNotice({ tone: 'ok', text: 'Question deleted.' })
+      notifySuccess('Question deleted.')
       await queryClient.invalidateQueries({ queryKey: ['questions'] })
     },
-    onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
+    onError: (error: Error) => notifyError(error.message),
   })
 
   const save = async (draft: Parameters<typeof questionPayload>[0]) => {
     const payload = questionPayload(draft)
     if (formMode === 'edit' && editing) {
       await apiRequest(`/questions/${editing.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
-      setNotice({ tone: 'ok', text: 'Question updated.' })
+      notifySuccess('Question updated.')
       setEditing(null)
       setFormMode('closed')
     } else {
       await apiRequest('/questions', { method: 'POST', body: JSON.stringify(payload) })
-      setNotice({ tone: 'ok', text: 'Question added to bank.' })
+      notifySuccess('Question added to bank.')
       setFormMode('closed')
     }
     await queryClient.invalidateQueries({ queryKey: ['questions'] })

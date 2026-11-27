@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Banner, Button, Field, TextInput } from '../components/ui'
-import { apiRequest, downloadPdf } from '../lib/api-client'
+import { apiRequest, downloadPdf, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
 type StudentPaperQuestion = {
@@ -244,10 +244,11 @@ export function ExaminerStudentPage() {
                   <PaperCheckingSection
                     paper={paper}
                     onSaved={async (msg) => {
-                      setNotice({ tone: 'ok', text: msg })
+                      notifySuccess(msg)
+                      setNotice(null)
                       await refresh()
                     }}
-                    onError={(msg) => setNotice({ tone: 'error', text: msg })}
+                    onError={(msg) => notifyError(msg)}
                   />
                 )}
               </li>
