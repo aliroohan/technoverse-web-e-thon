@@ -1,0 +1,11 @@
+{
+  "name": "web-e-thon",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "install": "npm install --include=dev --prefix backend && npm run build --prefix backend",
+    "start": "npm start --prefix backend"
+  }
+}
