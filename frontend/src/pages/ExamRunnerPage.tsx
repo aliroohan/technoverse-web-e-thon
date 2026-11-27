@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { Banner, Button, Select } from '../components/ui'
+import { Banner, Button, Dialog, Select } from '../components/ui'
 import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
 import { formatRemaining } from '../lib/format'
 import { enqueueOutbox, readOutbox, writeOutbox, type OutboxItem } from '../lib/outbox'
@@ -630,13 +630,7 @@ function Runner({
         </aside>
       )}
       {prefsOpen && (
-        <aside className="drawer">
-          <div className="drawer-head">
-            <h2>Workspace</h2>
-            <button type="button" className="btn-icon" aria-label="Close workspace settings" onClick={() => setPrefsOpen(false)}>
-              <X size={16} />
-            </button>
-          </div>
+        <Dialog title="Workspace" onClose={() => setPrefsOpen(false)}>
           {prefsError && <Banner tone="error">{prefsError}</Banner>}
           <label>
             Type size
@@ -660,28 +654,29 @@ function Runner({
               <option value="bottom">Bottom</option>
             </Select>
           </label>
-        </aside>
+        </Dialog>
       )}
       {confirming && (
-        <aside className="drawer">
-          <div className="drawer-head">
-            <h2>Submit this attempt?</h2>
-            <button type="button" className="btn-icon" aria-label="Close submit confirmation" disabled={submitting} onClick={() => setConfirming(false)}>
-              <X size={16} />
-            </button>
-          </div>
+        <Dialog
+          title="Submit this attempt?"
+          onClose={() => {
+            if (!submitting) setConfirming(false)
+          }}
+        >
           <p style={{ margin: 0 }}>You can submit once. Unanswered questions stay blank.</p>
           <p className="meta" style={{ margin: 0 }}>
             {unansweredCount} unanswered · {flaggedCount} marked for review
           </p>
           {submitError && <Banner tone="error">{submitError}</Banner>}
-          <div className="row">
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" disabled={submitting} onClick={() => setConfirming(false)}>
+              Keep working
+            </Button>
             <Button type="button" disabled={submitting} onClick={() => void submit()}>
               {submitting ? 'Submitting…' : 'Submit now'}
             </Button>
-            <Button type="button" variant="ghost" disabled={submitting} onClick={() => setConfirming(false)}>Keep working</Button>
           </div>
-        </aside>
+        </Dialog>
       )}
     </div>
   )
