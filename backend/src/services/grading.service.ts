@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { Answer, Attempt, Grade, ReportVerification, User } from '../models/index.js'
+import { Answer, Attempt, Enrollment, Grade, ReportVerification, User } from '../models/index.js'
 import { HttpError } from '../lib/http-error.js'
 import type { SessionUser } from '../types/domain.js'
 import { loadOwnedExam } from './access.js'
@@ -36,8 +36,30 @@ export const recomputeWritten = async (attemptId: string) => {
   return attempt
 }
 
+const resultsReleaseBlock = async (examId: string, publication: string) => {
+  if (publication !== 'published') return 'Publish the examination before releasing results'
+  const [attempts, enrollments] = await Promise.all([
+    Attempt.find({ examId, isSandbox: false }),
+    Enrollment.find({ examId }),
+  ])
+  if (enrollments.length === 0) return 'Release results after every enrolled candidate has finished'
+  const byCandidate = new Map(attempts.map((attempt) => [attempt.candidateId.toString(), attempt]))
+  const unsolved = enrollments.some((row) => {
+    const attempt = byCandidate.get(row.candidateId.toString())
+    return !attempt || attempt.status === 'in_progress'
+  })
+  if (unsolved || attempts.some((attempt) => attempt.status === 'in_progress')) {
+    return 'Release results after every enrolled candidate has finished'
+  }
+  if (attempts.some((attempt) => attempt.gradingStatus !== 'ready')) {
+    return 'Grade every written response before publishing results'
+  }
+  return null
+}
+
 export const listGrading = async (user: SessionUser, examId: string) => {
   const exam = await loadOwnedExam(examId, user)
+  const publishBlockReason = await resultsReleaseBlock(examId, exam.publication)
   const attempts = await Attempt.find({ examId, isSandbox: false, status: { $ne: 'in_progress' } }).sort({
     submittedAt: -1,
   })
@@ -49,6 +71,8 @@ export const listGrading = async (user: SessionUser, examId: string) => {
   return {
     examId,
     resultsPublished: exam.resultsPublished,
+    canPublishResults: publishBlockReason === null && !exam.resultsPublished,
+    publishBlockReason,
     attempts: attempts.map((attempt) => ({
       id: attempt._id.toString(),
       candidateId: attempt.candidateId.toString(),
@@ -111,11 +135,9 @@ export const gradeWritten = async (
 
 export const publishResults = async (user: SessionUser, examId: string) => {
   const exam = await loadOwnedExam(examId, user)
+  const blocked = await resultsReleaseBlock(examId, exam.publication)
+  if (blocked) throw new HttpError(400, blocked)
   const attempts = await Attempt.find({ examId, isSandbox: false, status: { $ne: 'in_progress' } })
-  const pending = attempts.filter((attempt) => attempt.gradingStatus !== 'ready')
-  if (pending.length > 0) {
-    throw new HttpError(400, 'Grade every written response before publishing results')
-  }
   const codes: { attemptId: string; code: string }[] = []
   for (const attempt of attempts) {
     const code = await issueCode(attempt.id)

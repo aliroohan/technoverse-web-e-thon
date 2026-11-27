@@ -139,7 +139,6 @@ const main = async () => {
   }
 
   await publishExam(omar, exam.id)
-  await enrollCandidate(omar, exam.id, hana.id)
   await enrollCandidate(omar, exam.id, bilal.id)
 
   const attempt = await startCandidateAttempt(bilalSession, exam.id)
@@ -164,6 +163,7 @@ const main = async () => {
     await gradeWritten(omar, attempt.id, written.questionId, 8, 'Clear trade-off and a named method.')
   }
   const published = await publishResults(omar, exam.id)
+  await enrollCandidate(omar, exam.id, hana.id)
 
   logger.info('Seed complete', {
     admin: admin.email,

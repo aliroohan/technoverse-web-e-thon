@@ -24,6 +24,8 @@ type Desk = ExamSummary & {
 
 type Grading = {
   resultsPublished: boolean
+  canPublishResults: boolean
+  publishBlockReason: string | null
   attempts: {
     id: string
     candidateName: string
@@ -586,10 +588,17 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
 
   return (
     <div className="stack">
-      <div className="row">
-        <Button type="button" onClick={() => void publish()} disabled={grading.data?.resultsPublished}>
+      <div className="stack">
+        <Button
+          type="button"
+          onClick={() => void publish()}
+          disabled={!grading.data || grading.data.resultsPublished || !grading.data.canPublishResults}
+        >
           {grading.data?.resultsPublished ? 'Results are published' : 'Publish results'}
         </Button>
+        {!grading.data?.resultsPublished && grading.data?.publishBlockReason && (
+          <p className="meta">{grading.data.publishBlockReason}</p>
+        )}
       </div>
       {grading.data?.attempts.map((attempt) => (
         <article className="card stack" key={attempt.id}>
