@@ -506,7 +506,79 @@ textarea:focus {
   text-transform: lowercase;
 }
 .pill.ok { background: var(--pine-soft); border-color: rgba(30, 92, 64, 0.25); color: var(--pine); }
+.pill.warn { background: var(--brass-soft); border-color: rgba(138, 90, 18, 0.28); color: var(--brass); }
 .pill.danger { background: var(--clay-soft); border-color: rgba(140, 52, 36, 0.25); color: var(--clay); }
+
+.qform {
+  display: grid;
+  gap: 0.85rem;
+}
+.qform label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  gap: 0.28rem;
+}
+.qform input:not([type='checkbox']):not([type='radio']),
+.qform select {
+  min-height: 38px;
+  padding: 0.42rem 0.68rem;
+  font-size: 0.93rem;
+  border-radius: 9px;
+}
+.qform textarea {
+  min-height: 4.75rem;
+  padding: 0.55rem 0.72rem;
+  font-size: 0.95rem;
+  border-radius: 10px;
+}
+.qform-meta-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.9fr 0.65fr;
+  gap: 0.7rem;
+  align-items: end;
+}
+.qform-choices {
+  display: grid;
+  gap: 0.5rem;
+}
+.qform-choice-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+.qform-choice-row input[type='radio'],
+.qform-choice-row input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--pine);
+  cursor: pointer;
+}
+.qbank-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.qbank-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+.qbank-choice.correct {
+  background: var(--pine-soft);
+  border-color: rgba(30, 92, 64, 0.28);
+  color: var(--pine);
+  font-weight: 560;
+}
 
 .admin-header {
   display: flex;
@@ -763,7 +835,7 @@ th, td { text-align: left; padding: 0.45rem 0.3rem; border-bottom: 1px solid var
     display: none;
   }
   .main { width: calc(100% - 1.5rem); padding: 1.25rem 0 2.5rem; }
-  .grid.two, .compact-grid, .login, .runner-body { grid-template-columns: 1fr; }
+  .grid.two, .compact-grid, .qform-meta-grid, .login, .runner-body { grid-template-columns: 1fr; }
   .login-hero { min-height: 28vh; padding: 1.5rem; }
   .login-panel { border-left: 0; border-top: 1px solid var(--line); }
   .runner-bar { flex-wrap: wrap; }

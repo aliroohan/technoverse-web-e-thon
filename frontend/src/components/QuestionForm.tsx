@@ -1,3 +1,4 @@
+import { Check, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import type { Question } from '../types/domain'
 import { Banner, Button, Field, Select, TextInput, Area } from './ui'
@@ -97,6 +98,19 @@ export function QuestionForm({
     })
   }
 
+  const removeChoice = (index: number) => {
+    if (form.choices.length <= 2) return
+    const nextChoices = form.choices.filter((_, i) => i !== index)
+    const nextCorrect = form.correctIndexes
+      .filter((i) => i !== index)
+      .map((i) => (i > index ? i - 1 : i))
+    setForm({
+      ...form,
+      choices: nextChoices,
+      correctIndexes: form.type === 'single' && nextCorrect.length === 0 ? [0] : nextCorrect,
+    })
+  }
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setPending(true)
@@ -111,15 +125,36 @@ export function QuestionForm({
   }
 
   return (
-    <form className="stack" onSubmit={(event) => void submit(event)}>
-      {heading && <h2>{heading}</h2>}
-      <Field label="Stem">
-        <Area value={form.stem} onChange={(event) => setForm({ ...form, stem: event.target.value })} required />
+    <form className="qform" onSubmit={(event) => void submit(event)}>
+      {heading && (
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{heading}</h2>
+          {onCancel && (
+            <Button type="button" variant="ghost" className="btn-icon" aria-label="Close form" onClick={onCancel}>
+              <X size={16} />
+            </Button>
+          )}
+        </div>
+      )}
+
+      <Field label="Question stem">
+        <Area
+          placeholder="Write the question prompt…"
+          value={form.stem}
+          onChange={(event) => setForm({ ...form, stem: event.target.value })}
+          required
+        />
       </Field>
-      <Field label="Category">
-        <TextInput value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} required />
-      </Field>
-      <div className="row">
+
+      <div className="qform-meta-grid">
+        <Field label="Category">
+          <TextInput
+            placeholder="e.g. graphs"
+            value={form.category}
+            onChange={(event) => setForm({ ...form, category: event.target.value })}
+            required
+          />
+        </Field>
         <Field label="Type">
           <Select
             value={form.type}
@@ -149,14 +184,42 @@ export function QuestionForm({
           </Select>
         </Field>
         <Field label="Marks">
-          <TextInput type="number" min={1} value={form.marks} onChange={(event) => setForm({ ...form, marks: Number(event.target.value) })} />
+          <TextInput
+            type="number"
+            min={1}
+            value={form.marks}
+            onChange={(event) => setForm({ ...form, marks: Number(event.target.value) })}
+          />
         </Field>
       </div>
-      {form.type !== 'written' &&
-        form.choices.map((choice, index) => (
-          <div className="row" key={index}>
-            <Field label={`Choice ${index + 1}`}>
+
+      {form.type !== 'written' && (
+        <div className="qform-choices">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <span className="meta" style={{ fontSize: '0.85rem' }}>
+              Choices (mark correct {form.type === 'single' ? 'option' : 'options'})
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              className="btn-sm"
+              onClick={() => setForm({ ...form, choices: [...form.choices, ''] })}
+            >
+              <Plus size={14} /> Add choice
+            </Button>
+          </div>
+          {form.choices.map((choice, index) => (
+            <div className="qform-choice-row" key={index}>
+              <input
+                type={form.type === 'single' ? 'radio' : 'checkbox'}
+                name="correct"
+                aria-label={`Mark choice ${index + 1} correct`}
+                checked={form.correctIndexes.includes(index)}
+                onChange={() => toggleCorrect(index)}
+              />
               <TextInput
+                aria-label={`Choice ${index + 1}`}
+                placeholder={`Choice ${index + 1}`}
                 value={choice}
                 onChange={(event) => {
                   const choices = [...form.choices]
@@ -164,33 +227,34 @@ export function QuestionForm({
                   setForm({ ...form, choices })
                 }}
               />
-            </Field>
-            <label className="inline-check">
-              <input
-                type={form.type === 'single' ? 'radio' : 'checkbox'}
-                name="correct"
-                checked={form.correctIndexes.includes(index)}
-                onChange={() => toggleCorrect(index)}
-              />
-              Correct
-            </label>
-          </div>
-        ))}
-      {form.type !== 'written' && (
-        <Button type="button" variant="ghost" onClick={() => setForm({ ...form, choices: [...form.choices, ''] })}>
-          Add choice
-        </Button>
+              {form.choices.length > 2 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="btn-icon"
+                  aria-label={`Remove choice ${index + 1}`}
+                  title="Remove choice"
+                  onClick={() => removeChoice(index)}
+                >
+                  <X size={14} />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       )}
+
       {error && <Banner tone="error">{error}</Banner>}
-      <div className="row">
-        <Button type="submit" block={submitBlock} disabled={pending}>
-          {submitLabel}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
+
+      <div className="row" style={{ justifyContent: submitBlock ? 'stretch' : 'flex-end', marginTop: '0.15rem' }}>
+        {onCancel && !submitBlock && (
+          <Button type="button" variant="ghost" className="btn-sm" onClick={onCancel}>
             Cancel
           </Button>
         )}
+        <Button type="submit" block={submitBlock} className={submitBlock ? undefined : 'btn-sm'} disabled={pending}>
+          <Check size={15} /> {submitLabel}
+        </Button>
       </div>
     </form>
   )
