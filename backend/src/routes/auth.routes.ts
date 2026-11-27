@@ -12,7 +12,7 @@ const loginSchema = z.object({
 
 const cookieOptions = {
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
   secure: env.NODE_ENV === 'production',
   maxAge: 8 * 60 * 60 * 1000,
   path: '/',
@@ -31,7 +31,11 @@ authRouter.post(
 )
 
 authRouter.post('/logout', (_req, res) => {
-  res.clearCookie(env.COOKIE_NAME, { path: '/' })
+  res.clearCookie(env.COOKIE_NAME, {
+    path: '/',
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
+  })
   res.json({ success: true, data: { loggedOut: true } })
 })
 

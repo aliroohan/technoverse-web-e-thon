@@ -4,7 +4,7 @@ import { useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { Banner, Button, Select } from '../components/ui'
-import { ApiError, apiRequest } from '../lib/api-client'
+import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
 import { formatRemaining } from '../lib/format'
 import { enqueueOutbox, readOutbox, writeOutbox, type OutboxItem } from '../lib/outbox'
 import type { AttemptView, Preferences } from '../types/domain'
@@ -102,7 +102,7 @@ function Runner({
   }, [attempt.id, onAttempt])
 
   useEffect(() => {
-    const socket = io({ path: '/socket.io', withCredentials: true })
+    const socket = io(socketOrigin, { path: '/socket.io', withCredentials: true })
     socket.emit('exam:join', attempt.examId)
     socket.emit('attempt:join', attempt.id)
     socket.on('announcement', (announcement: AttemptView['announcements'][number]) => {

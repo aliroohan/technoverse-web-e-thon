@@ -1,6 +1,9 @@
 import type { ApiErrorResponse, ApiResponse } from '../types/api'
 
-const apiBase = '/api'
+const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
+
+/** Socket.IO host. Empty when the API is same-origin through the Vite proxy. */
+export const socketOrigin = apiBase.startsWith('http') ? apiBase.replace(/\/api$/, '') : undefined
 
 type RequestOptions = RequestInit & {
   params?: Record<string, string | number | boolean | undefined>
@@ -38,7 +41,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   })
 
   const text = await response.text()
-  const body = text ? (JSON.parse(text) as ApiResponse<T> | ApiErrorResponse) : null
+  let body: ApiResponse<T> | ApiErrorResponse | null = null
+  if (text) {
+    try {
+      body = JSON.parse(text) as ApiResponse<T> | ApiErrorResponse
+    } catch {
+      throw new ApiError(
+        response.status,
+        'The API did not return JSON. Set VITE_API_URL to the backend origin, including /api, and redeploy the frontend.',
+      )
+    }
+  }
 
   if (!response.ok || !body || !body.success) {
     const message = body && !body.success ? body.error.message : `Request failed (${response.status})`
