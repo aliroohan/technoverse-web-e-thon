@@ -24,7 +24,7 @@ export const signSession = (user: SessionUser) =>
 export const readSession = (token: string | undefined): TokenPayload => {
   if (!token) throw new HttpError(401, 'Sign in required')
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET)
+    const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] })
     if (typeof payload === 'string' || typeof payload.sub !== 'string') {
       throw new HttpError(401, 'Sign in required')
     }

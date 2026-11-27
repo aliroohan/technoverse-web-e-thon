@@ -66,17 +66,27 @@ export const selectPaper = (
     const targetCount = settings.questionCount ?? pinned.length + pool.length
     const need = Math.max(0, Math.min(pool.length, targetCount - pinned.length))
     const budget = settings.difficultyBudget ?? need * 2
+    const tolerance = Math.max(0, settings.tolerance ?? 0)
     let best = drawSample(pool, need, budget, rng)
     let bestDistance = Math.abs(weightOf(best) - budget)
+    let bestInTolerance = bestDistance <= tolerance
 
     for (let attempt = 0; attempt < 39; attempt += 1) {
       const sample = drawSample(shuffle(pool, rng), need, budget, rng)
       const distance = Math.abs(weightOf(sample) - budget)
+      const inTolerance = distance <= tolerance
       const sampleCategories = new Set(sample.map((item) => item.category)).size
       const bestCategories = new Set(best.map((item) => item.category)).size
-      if (distance < bestDistance || (distance === bestDistance && sampleCategories > bestCategories)) {
+
+      const betterTolerance = inTolerance && !bestInTolerance
+      const sameTier = inTolerance === bestInTolerance
+      const betterDistance = sameTier && distance < bestDistance
+      const betterDiversity = sameTier && distance === bestDistance && sampleCategories > bestCategories
+
+      if (betterTolerance || betterDistance || betterDiversity) {
         best = sample
         bestDistance = distance
+        bestInTolerance = inTolerance
       }
     }
     selectedPool = best

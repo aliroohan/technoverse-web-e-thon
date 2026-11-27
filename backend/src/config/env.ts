@@ -20,4 +20,9 @@ if (!parsed.success) {
   process.exit(1)
 }
 
+if (parsed.data.NODE_ENV === 'production' && (parsed.data.JWT_SECRET === 'dev-only-change-me' || parsed.data.JWT_SECRET.length < 16)) {
+  console.error('JWT_SECRET must be set to a strong secret (>= 16 chars) in production')
+  process.exit(1)
+}
+
 export const env = parsed.data
