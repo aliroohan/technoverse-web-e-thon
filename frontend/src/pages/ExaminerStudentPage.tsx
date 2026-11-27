@@ -310,8 +310,20 @@ function PaperCheckingSection({
 
         const selected = new Set(question.answer.choiceIds)
         const correct = new Set(question.correctChoiceIds)
-        const exact =
-          selected.size === correct.size && [...selected].every((id) => correct.has(id))
+        let awarded = 0
+        if (question.type === 'single') {
+          const only = [...selected]
+          awarded = only.length === 1 && correct.size === 1 && only[0] !== undefined && correct.has(only[0]) ? question.marks : 0
+        } else if (correct.size > 0) {
+          let correctSelected = 0
+          let wrongSelected = 0
+          for (const id of selected) {
+            if (correct.has(id)) correctSelected += 1
+            else wrongSelected += 1
+          }
+          awarded = Math.max(0, Math.round(((correctSelected - wrongSelected) / correct.size) * question.marks * 100) / 100)
+        }
+        const pillTone = awarded >= question.marks ? 'pill ok meta-chip' : awarded > 0 ? 'pill warn meta-chip' : 'pill danger meta-chip'
 
         return (
           <div
@@ -329,9 +341,9 @@ function PaperCheckingSection({
               <strong style={{ fontSize: '0.96rem' }}>
                 {idx + 1}. {question.stem}
               </strong>
-              <span className={exact ? 'pill ok meta-chip' : 'pill danger meta-chip'} style={{ flexShrink: 0 }}>
-                {exact ? <Check size={13} /> : <XCircle size={13} />}
-                {question.marks}
+              <span className={pillTone} style={{ flexShrink: 0 }}>
+                {awarded > 0 ? <Check size={13} /> : <XCircle size={13} />}
+                {awarded} / {question.marks}
               </span>
             </div>
             <div className="qbank-choices" style={{ marginTop: 0 }}>
