@@ -3,7 +3,7 @@ import type { Role, SessionUser } from '../types/domain'
 
 export const fetchMe = async (): Promise<SessionUser | null> => {
   try {
-    return await apiRequest<SessionUser>('/auth/me')
+    return await apiRequest<SessionUser>('/auth/me', { silent: true })
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null
     throw error

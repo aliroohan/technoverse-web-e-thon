@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, Shield, UserCheck, UserPlus, Users, UserX, X } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Banner, Button, Field, Select, TextInput } from '../components/ui'
-import { apiRequest } from '../lib/api-client'
+import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import type { Role } from '../types/domain'
 
 type UserRow = { id: string; name: string; email: string; role: Role; active: boolean }
@@ -21,7 +21,8 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       setForm({ name: '', email: '', password: '', role: 'candidate' })
       setShowCreate(false)
-      setNotice({ tone: 'ok', text: 'Account created.' })
+      setNotice(null)
+      notifySuccess('Account created.')
       await queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
@@ -36,7 +37,7 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] })
     },
-    onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
+    onError: (error: Error) => notifyError(error.message),
   })
 
   const filtered = useMemo(() => {

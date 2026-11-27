@@ -86,7 +86,7 @@ function Runner({
     const kept: OutboxItem[] = []
     for (const item of queued) {
       try {
-        await apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(item) })
+        await apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(item), silent: true })
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
           setLateNote(error.message)
@@ -119,6 +119,7 @@ function Runner({
     const beat = window.setInterval(() => {
       void apiRequest<{ serverNow: string; deadlineAt: string; status: AttemptView['status'] }>(`/attempts/${attempt.id}/heartbeat`, {
         method: 'POST',
+        silent: true,
       }).then((pulse) => {
         setOffset(new Date(pulse.serverNow).getTime() - Date.now())
         setAttempt((current) => ({ ...current, deadlineAt: pulse.deadlineAt, status: pulse.status }))
@@ -148,10 +149,10 @@ function Runner({
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }), silent: true })
       }
       if (document.visibilityState === 'visible' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }), silent: true })
       }
     }
     document.addEventListener('visibilitychange', onHide)
@@ -173,7 +174,7 @@ function Runner({
     window.clearTimeout(timers.current[questionId])
     timers.current[questionId] = window.setTimeout(() => {
       setSaveState('saving')
-      void apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(payload) })
+      void apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(payload), silent: true })
         .then(() => setSaveState('saved'))
         .catch((error: Error) => {
           enqueueOutbox(attempt.id, payload)
@@ -185,6 +186,7 @@ function Runner({
             void apiRequest(`/attempts/${attempt.id}/incidents`, {
               method: 'POST',
               body: JSON.stringify({ type: 'autosave_failed' }),
+              silent: true,
             }).catch(() => undefined)
           }
         })
@@ -368,7 +370,7 @@ function Runner({
               setScratchpad(text)
               window.clearTimeout(timers.current.scratch)
               timers.current.scratch = window.setTimeout(() => {
-                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }) })
+                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }), silent: true })
               }, 500)
             }}
           />
