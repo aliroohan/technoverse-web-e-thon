@@ -13,8 +13,10 @@ import {
 } from '../services/attempt.service.js'
 import {
   assignQuestion,
+  assignQuestionsBulk,
   createExam,
   enrollCandidate,
+  enrollCandidatesBulk,
   getExam,
   listCandidateExams,
   listExams,
@@ -112,6 +114,16 @@ examRouter.post(
   }),
 )
 
+examRouter.post(
+  '/:id/questions/bulk',
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      questionIds: z.array(z.string().min(1)).min(1),
+    }).parse(req.body)
+    res.json({ success: true, data: await assignQuestionsBulk(asAuthed(req).user, String(req.params.id), body.questionIds) })
+  }),
+)
+
 examRouter.patch(
   '/:id/questions/:questionId',
   asyncHandler(async (req, res) => {
@@ -138,6 +150,14 @@ examRouter.post(
   asyncHandler(async (req, res) => {
     const body = z.object({ candidateId: z.string().min(1) }).parse(req.body)
     res.json({ success: true, data: await enrollCandidate(asAuthed(req).user, String(req.params.id), body.candidateId) })
+  }),
+)
+
+examRouter.post(
+  '/:id/enrollments/bulk',
+  asyncHandler(async (req, res) => {
+    const body = z.object({ candidateIds: z.array(z.string().min(1)).min(1) }).parse(req.body)
+    res.json({ success: true, data: await enrollCandidatesBulk(asAuthed(req).user, String(req.params.id), body.candidateIds) })
   }),
 )
 

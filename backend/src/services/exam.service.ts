@@ -222,6 +222,28 @@ export const assignQuestion = async (
   return getExam(user, examId)
 }
 
+export const assignQuestionsBulk = async (user: SessionUser, examId: string, questionIds: string[]) => {
+  const exam = await loadOwnedExam(examId, user)
+  if (exam.publication !== 'draft') throw new HttpError(400, 'The question set is locked after publication')
+  const uniqueIds = [...new Set(questionIds)]
+  const questions = await Question.find({ _id: { $in: uniqueIds } })
+  if (questions.length !== uniqueIds.length) throw new HttpError(404, 'One or more questions were not found')
+  const existing = await ExamQuestion.find({ examId, questionId: { $in: uniqueIds } }).select('questionId')
+  const taken = new Set(existing.map((row) => row.questionId.toString()))
+  let nextOrder = await ExamQuestion.countDocuments({ examId })
+  const toInsert = questions
+    .filter((question) => !taken.has(question._id.toString()))
+    .map((question) => ({
+      examId,
+      questionId: question._id,
+      marks: question.marks,
+      pinned: question.type === 'written',
+      order: nextOrder++,
+    }))
+  if (toInsert.length > 0) await ExamQuestion.insertMany(toInsert)
+  return getExam(user, examId)
+}
+
 export const updateAssignment = async (
   user: SessionUser,
   examId: string,
@@ -251,6 +273,22 @@ export const enrollCandidate = async (user: SessionUser, examId: string, candida
   if (!candidate || candidate.role !== 'candidate') throw new HttpError(400, 'Choose a candidate account')
   const existing = await Enrollment.findOne({ examId: exam._id, candidateId })
   if (!existing) await Enrollment.create({ examId: exam._id, candidateId })
+  return getExam(user, examId)
+}
+
+export const enrollCandidatesBulk = async (user: SessionUser, examId: string, candidateIds: string[]) => {
+  const exam = await loadOwnedExam(examId, user)
+  const uniqueIds = [...new Set(candidateIds)]
+  const candidates = await User.find({ _id: { $in: uniqueIds }, role: 'candidate' }).select('_id')
+  if (candidates.length !== uniqueIds.length) {
+    throw new HttpError(400, 'One or more selected accounts are not valid candidates')
+  }
+  const existing = await Enrollment.find({ examId: exam._id, candidateId: { $in: uniqueIds } }).select('candidateId')
+  const enrolledSet = new Set(existing.map((row) => row.candidateId.toString()))
+  const toInsert = candidates
+    .filter((candidate) => !enrolledSet.has(candidate._id.toString()))
+    .map((candidate) => ({ examId: exam._id, candidateId: candidate._id }))
+  if (toInsert.length > 0) await Enrollment.insertMany(toInsert)
   return getExam(user, examId)
 }
 

@@ -292,6 +292,7 @@ export function QuestionBankPage() {
                     className="btn-icon"
                     aria-label={`Delete ${question.stem}`}
                     title="Delete"
+                    disabled={remove.isPending && remove.variables === question.id}
                     onClick={() => remove.mutate(question.id)}
                   >
                     <Trash2 size={15} />

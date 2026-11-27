@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
-import { Award, Clock, FileDown, MessageSquare } from 'lucide-react'
+import { Link, useParams } from '@tanstack/react-router'
+import { ArrowLeft, Award, Clock, FileDown, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { VerifyShare } from '../components/VerifyShare'
 import { Banner, Button } from '../components/ui'
@@ -31,7 +31,18 @@ export function ResultPage() {
   })
 
   if (result.isPending) return <p className="meta">Loading…</p>
-  if (result.error) return <p className="banner error" role="alert">{result.error.message}</p>
+  if (result.error) {
+    return (
+      <section className="stack">
+        <div>
+          <Link to="/candidate" className="btn-ghost btn-icon" aria-label="Back to examinations" title="Back">
+            <ArrowLeft size={16} />
+          </Link>
+        </div>
+        <p className="banner error" role="alert">{result.error.message}</p>
+      </section>
+    )
+  }
   const data = result.data
   if (!data) return null
 
@@ -49,6 +60,11 @@ export function ResultPage() {
 
   return (
     <article className="stack">
+      <div>
+        <Link to="/candidate" className="btn-ghost btn-icon" aria-label="Back to examinations" title="Back">
+          <ArrowLeft size={16} />
+        </Link>
+      </div>
       <div>
         <h1 className="page-title">{data.examTitle}</h1>
         <div className="meta-row">
