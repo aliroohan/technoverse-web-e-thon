@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import {
   Activity,
+  ArrowLeft,
   BarChart2,
   Calendar,
   Check,
@@ -133,6 +134,11 @@ export function ExamDeskPage() {
   if (desk.isError || !desk.data) {
     return (
       <section className="stack">
+        <div>
+          <Link to="/examiner/exams" className="btn-ghost btn-icon" aria-label="Back to examinations" title="Back">
+            <ArrowLeft size={16} />
+          </Link>
+        </div>
         <Banner tone="error">
           {desk.error instanceof Error ? desk.error.message : 'Could not load examination.'}
         </Banner>
@@ -157,7 +163,12 @@ export function ExamDeskPage() {
 
   return (
     <section>
-      <p className="meta">{exam.lifecycle}{exam.resultsPublished ? ' · published' : ''}</p>
+      <div className="row" style={{ gap: '0.75rem', alignItems: 'center', marginBottom: '0.25rem' }}>
+        <Link to="/examiner/exams" className="btn-ghost btn-icon" aria-label="Back to examinations" title="Back">
+          <ArrowLeft size={16} />
+        </Link>
+        <p className="meta" style={{ margin: 0 }}>{exam.lifecycle}{exam.resultsPublished ? ' · published' : ''}</p>
+      </div>
       <h1 className="page-title">{exam.title}</h1>
       {notice && <Banner>{notice}</Banner>}
       <div className="tabs" role="tablist" aria-label="Examination sections">
@@ -206,9 +217,12 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
   const [fairPaper, setFairPaper] = useState(exam.settings.fairPaper)
   const [questionCount, setQuestionCount] = useState(exam.settings.questionCount ?? 6)
   const [budget, setBudget] = useState(exam.settings.difficultyBudget ?? 10)
+  const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const locked = exam.publication === 'published'
 
   const save = async () => {
+    setSaving(true)
     try {
       await apiRequest(`/exams/${exam.id}`, {
         method: 'PATCH',
@@ -227,16 +241,21 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
       await onSaved()
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not save')
+    } finally {
+      setSaving(false)
     }
   }
 
   const publish = async () => {
+    setPublishing(true)
     try {
       await apiRequest(`/exams/${exam.id}/publish`, { method: 'POST' })
       onNotice('Published. Candidates can enter when the window opens.')
       await onSaved()
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not publish')
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -271,9 +290,13 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
       )}
       {locked && <p className="meta">Settings locked after publish; close time can still be extended.</p>}
       <div className="row">
-        <Button type="button" onClick={() => void save()}><Check size={15} /> Save</Button>
+        <Button type="button" disabled={saving || publishing} onClick={() => void save()}>
+          <Check size={15} /> {saving ? 'Saving…' : 'Save'}
+        </Button>
         {exam.publication === 'draft' && (
-          <Button type="button" variant="ghost" onClick={() => void publish()}><Send size={15} /> Publish</Button>
+          <Button type="button" variant="ghost" disabled={saving || publishing} onClick={() => void publish()}>
+            <Send size={15} /> {publishing ? 'Publishing…' : 'Publish'}
+          </Button>
         )}
       </div>
     </div>
@@ -285,6 +308,9 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
   const bank = useQuery({ queryKey: ['questions'], queryFn: () => apiRequest<Question[]>('/questions') })
   const [bankOpen, setBankOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
+  const [adding, setAdding] = useState(false)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const [editor, setEditor] = useState<null | { mode: 'create' } | { mode: 'edit'; question: Question }>(null)
   const [now] = useState(() => Date.now())
   const draft = exam.publication === 'draft'
@@ -296,27 +322,35 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
   }
 
   const addSelected = async () => {
+    setAdding(true)
     try {
-      for (const questionId of selected) {
-        await apiRequest(`/exams/${exam.id}/questions`, { method: 'POST', body: JSON.stringify({ questionId }) })
-      }
+      await apiRequest(`/exams/${exam.id}/questions/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({ questionIds: selected }),
+      })
+      const count = selected.length
       setSelected([])
       setBankOpen(false)
-      onNotice(selected.length === 1 ? '1 question added to the paper.' : `${selected.length} questions added to the paper.`)
+      onNotice(count === 1 ? '1 question added to the paper.' : `${count} questions added to the paper.`)
       await onSaved()
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not assign')
       await onSaved()
+    } finally {
+      setAdding(false)
     }
   }
 
   const openEdit = async (questionId: string) => {
+    setOpeningId(questionId)
     try {
       const known = bank.data?.find((question) => question.id === questionId)
       const question = known ?? (await apiRequest<Question>(`/questions/${questionId}`))
       setEditor({ mode: 'edit', question })
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not open that question')
+    } finally {
+      setOpeningId(null)
     }
   }
 
@@ -386,6 +420,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
                     className="btn-icon"
                     aria-label={`Edit ${question.stem}`}
                     title="Edit"
+                    disabled={openingId === question.questionId}
                     onClick={() => void openEdit(question.questionId)}
                   >
                     <Pencil size={15} />
@@ -398,7 +433,18 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
                     className="btn-icon"
                     aria-label={`Remove ${question.stem}`}
                     title="Remove"
-                    onClick={() => void apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' }).then(onSaved)}
+                    disabled={removingId === question.questionId}
+                    onClick={async () => {
+                      setRemovingId(question.questionId)
+                      try {
+                        await apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' })
+                        await onSaved()
+                      } catch (error) {
+                        onNotice(error instanceof Error ? error.message : 'Could not remove question')
+                      } finally {
+                        setRemovingId(null)
+                      }
+                    }}
                   >
                     <Trash2 size={15} />
                   </Button>
@@ -414,8 +460,8 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
           title="Questions"
           onClose={() => setBankOpen(false)}
           footer={
-            <Button type="button" disabled={selected.length === 0} onClick={() => void addSelected()}>
-              {selected.length === 1 ? 'Add 1 question' : `Add ${selected.length} questions`}
+            <Button type="button" disabled={adding || selected.length === 0} onClick={() => void addSelected()}>
+              {adding ? 'Adding…' : selected.length === 1 ? 'Add 1 question' : `Add ${selected.length} questions`}
             </Button>
           }
         >
@@ -466,6 +512,8 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
   })
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
+  const [enrolling, setEnrolling] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const [panel, setPanel] = useState<'list' | 'new' | 'import'>('list')
   const enrolled = new Set(exam.enrollments.map((person) => person.candidateId))
 
@@ -474,10 +522,12 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
   }
 
   const enroll = async () => {
+    setEnrolling(true)
     try {
-      for (const candidateId of selected) {
-        await apiRequest(`/exams/${exam.id}/enrollments`, { method: 'POST', body: JSON.stringify({ candidateId }) })
-      }
+      await apiRequest(`/exams/${exam.id}/enrollments/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({ candidateIds: selected }),
+      })
       const count = selected.length
       setSelected([])
       setOpen(false)
@@ -486,6 +536,8 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not enroll')
       await onSaved()
+    } finally {
+      setEnrolling(false)
     }
   }
 
@@ -517,11 +569,18 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
               className="btn-icon"
               aria-label={`Remove ${person.name}`}
               title="Remove"
-              onClick={() =>
-                void apiRequest(`/exams/${exam.id}/enrollments/${person.candidateId}`, { method: 'DELETE' })
-                  .then(onSaved)
-                  .catch((error: Error) => onNotice(error.message))
-              }
+              disabled={removingId === person.candidateId}
+              onClick={async () => {
+                setRemovingId(person.candidateId)
+                try {
+                  await apiRequest(`/exams/${exam.id}/enrollments/${person.candidateId}`, { method: 'DELETE' })
+                  await onSaved()
+                } catch (error) {
+                  onNotice(error instanceof Error ? error.message : 'Could not remove candidate')
+                } finally {
+                  setRemovingId(null)
+                }
+              }}
             >
               <Trash2 size={15} />
             </Button>
@@ -535,8 +594,8 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
           onClose={() => setOpen(false)}
           footer={
             panel === 'list' ? (
-              <Button type="button" disabled={selected.length === 0} onClick={() => void enroll()}>
-                {selected.length === 1 ? 'Enroll 1' : `Enroll ${selected.length}`}
+              <Button type="button" disabled={enrolling || selected.length === 0} onClick={() => void enroll()}>
+                {enrolling ? 'Enrolling…' : selected.length === 1 ? 'Enroll 1' : `Enroll ${selected.length}`}
               </Button>
             ) : undefined
           }
@@ -673,8 +732,10 @@ function Monitor({ examId }: { examId: string }) {
 function Marking({ examId, onNotice }: { examId: string; onNotice: (value: string) => void }) {
   const queryClient = useQueryClient()
   const grading = useQuery({ queryKey: ['grading', examId], queryFn: () => apiRequest<Grading>(`/exams/${examId}/grading`) })
+  const [publishing, setPublishing] = useState(false)
 
   const publish = async () => {
+    setPublishing(true)
     try {
       await apiRequest(`/exams/${examId}/publish-results`, { method: 'POST' })
       onNotice('Results published. Candidates can now see their own scores.')
@@ -682,6 +743,8 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
       await queryClient.invalidateQueries({ queryKey: ['exam', examId] })
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not publish')
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -697,9 +760,9 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
         <Button
           type="button"
           onClick={() => void publish()}
-          disabled={!grading.data || grading.data.resultsPublished || !grading.data.canPublishResults}
+          disabled={publishing || !grading.data || grading.data.resultsPublished || !grading.data.canPublishResults}
         >
-          {grading.data?.resultsPublished ? 'Results are published' : 'Publish results'}
+          {publishing ? 'Publishing…' : grading.data?.resultsPublished ? 'Results are published' : 'Publish results'}
         </Button>
         {!grading.data?.resultsPublished && grading.data?.publishBlockReason && (
           <p className="meta">{grading.data.publishBlockReason}</p>
@@ -741,21 +804,26 @@ function WrittenMark({
   const [marks, setMarks] = useState(existing?.awardedMarks ?? 0)
   const [comment, setComment] = useState(existing?.comment ?? '')
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   return (
     <form
       className="stack"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
-        void apiRequest(`/grading/${attemptId}/questions/${question.questionId}`, {
-          method: 'PUT',
-          body: JSON.stringify({ awardedMarks: marks, comment }),
-        })
-          .then(async () => {
-            setError('')
-            await queryClient.invalidateQueries({ queryKey: ['grading', examId] })
+        setSaving(true)
+        try {
+          await apiRequest(`/grading/${attemptId}/questions/${question.questionId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ awardedMarks: marks, comment }),
           })
-          .catch((err: Error) => setError(err.message))
+          setError('')
+          await queryClient.invalidateQueries({ queryKey: ['grading', examId] })
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not save mark')
+        } finally {
+          setSaving(false)
+        }
       }}
     >
       <p>{question.stem}</p>
@@ -767,7 +835,7 @@ function WrittenMark({
         <TextInput value={comment} onChange={(event) => setComment(event.target.value)} />
       </Field>
       {error && <Banner tone="error">{error}</Banner>}
-      <Button type="submit" variant="ghost">Save mark</Button>
+      <Button type="submit" variant="ghost" disabled={saving}>{saving ? 'Saving…' : 'Save mark'}</Button>
     </form>
   )
 }
