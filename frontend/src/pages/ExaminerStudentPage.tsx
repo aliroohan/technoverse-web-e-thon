@@ -292,14 +292,9 @@ function PaperCheckingSection({
                 return (
                   <span
                     key={choice.id}
-                    className={isRight ? 'qbank-choice correct' : 'qbank-choice'}
-                    style={
-                      picked && !isRight
-                        ? { background: 'var(--clay-soft)', borderColor: 'rgba(140, 52, 36, 0.28)', color: 'var(--clay)' }
-                        : undefined
-                    }
+                    className={picked ? (isRight ? 'qbank-choice correct' : 'qbank-choice wrong') : 'qbank-choice'}
                   >
-                    {isRight ? <Check size={13} /> : picked ? <XCircle size={13} /> : null}
+                    {picked ? (isRight ? <Check size={13} /> : <XCircle size={13} />) : null}
                     {choice.text}
                   </span>
                 )

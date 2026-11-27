@@ -799,6 +799,12 @@ textarea:focus {
   color: var(--pine);
   font-weight: 560;
 }
+.qbank-choice.wrong {
+  background: var(--clay-soft);
+  border-color: rgba(140, 52, 36, 0.28);
+  color: var(--clay);
+  font-weight: 560;
+}
 
 .student-avatar {
   width: 40px;
