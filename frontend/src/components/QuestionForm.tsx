@@ -252,7 +252,7 @@ export function QuestionForm({
             Cancel
           </Button>
         )}
-        <Button type="submit" block={submitBlock} className={submitBlock ? undefined : 'btn-sm'} disabled={pending}>
+        <Button type="submit" block={submitBlock} className={submitBlock ? undefined : 'btn-sm'} loading={pending}>
           <Check size={15} /> {submitLabel}
         </Button>
       </div>

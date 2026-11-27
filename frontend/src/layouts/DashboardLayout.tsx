@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button } from '../components/ui'
+import { Button, Loader } from '../components/ui'
 import {
   BookOpen,
   ClipboardList,
@@ -73,7 +73,7 @@ export function DashboardLayout() {
   if (me.isPending) {
     return (
       <main className="main stack">
-        <p className="meta">Loading workspace…</p>
+        <Loader full label="Loading workspace" />
       </main>
     )
   }

@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { ScratchpadDrawer } from '../components/ScratchpadDrawer'
-import { Banner, Button, Dialog, Select } from '../components/ui'
+import { Banner, Button, Dialog, Loader, Select, Spinner } from '../components/ui'
 import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
 import { formatRemaining } from '../lib/format'
 import { enqueueOutbox, readOutbox, writeOutbox, type OutboxItem } from '../lib/outbox'
@@ -43,7 +43,7 @@ export function ExamRunnerPage() {
     queryFn: () => apiRequest<Preferences>('/preferences'),
   })
 
-  if (attempt.isPending || preferences.isPending) return <p className="main">Opening the paper…</p>
+  if (attempt.isPending || preferences.isPending) return <Loader full label="Opening paper" />
   if (attempt.error || !attempt.data || !preferences.data) {
     return (
       <main className="main stack">
@@ -334,7 +334,7 @@ function Runner({
 
   const statusLabel = useMemo(() => {
     if (!online) return 'Offline · queued'
-    if (saveState === 'saving') return 'Saving…'
+    if (saveState === 'saving') return ''
     if (saveState === 'saved') return 'Saved'
     if (saveState === 'failed') return 'Retry pending'
     if (saveState === 'rejected') return 'Deadline passed'
@@ -399,9 +399,11 @@ function Runner({
             </p>
             {urgent && attempt.status === 'in_progress' && <span className="timer-urgent-tag">Ending soon</span>}
           </div>
-          <p className={syncTone} role="status">
+          <p className={syncTone} role="status" aria-label={saveState === 'saving' ? 'Saving' : undefined}>
             {!online ? (
               <WifiOff size={14} />
+            ) : saveState === 'saving' ? (
+              <Spinner size={14} />
             ) : saveState === 'rejected' || saveState === 'failed' ? (
               <AlertTriangle size={14} />
             ) : saveState === 'saved' ? (
@@ -699,8 +701,8 @@ function Runner({
             <Button type="button" variant="ghost" disabled={submitting} onClick={() => setConfirming(false)}>
               Keep working
             </Button>
-            <Button type="button" disabled={submitting} onClick={() => void submit()}>
-              {submitting ? 'Submitting…' : 'Submit now'}
+            <Button type="button" loading={submitting} onClick={() => void submit()}>
+              Submit now
             </Button>
           </div>
         </Dialog>

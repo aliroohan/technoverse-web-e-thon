@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { CandidateForm, CandidateImport, type CandidateImportResult } from '../components/CandidateTools'
-import { Banner, Button, Select, TextInput } from '../components/ui'
+import { Banner, Button, Loader, Select, TextInput } from '../components/ui'
 import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
@@ -202,7 +202,7 @@ export function CandidatesPage() {
         </Select>
       </div>
 
-      {people.isPending && <p className="meta">Loading…</p>}
+      {people.isPending && <Loader label="Loading students" />}
       {people.error && <Banner tone="error">{people.error.message}</Banner>}
 
       {people.data && filtered.length === 0 ? (

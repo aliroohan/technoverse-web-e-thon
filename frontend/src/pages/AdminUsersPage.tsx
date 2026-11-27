@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, Shield, UserCheck, UserPlus, Users, UserX, X } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
-import { Banner, Button, Field, Select, TextInput } from '../components/ui'
+import { Banner, Button, Field, Loader, Select, TextInput } from '../components/ui'
 import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import type { Role } from '../types/domain'
 
@@ -148,9 +148,8 @@ export function AdminUsersPage() {
             <Button type="button" variant="ghost" className="btn-sm" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="btn-sm" disabled={create.isPending}>
-              <UserPlus size={15} />
-              {create.isPending ? 'Creating…' : 'Create'}
+            <Button type="submit" className="btn-sm" loading={create.isPending}>
+              <UserPlus size={15} /> Create
             </Button>
           </div>
         </form>
@@ -185,7 +184,7 @@ export function AdminUsersPage() {
         </Select>
       </div>
 
-      {users.isPending && <p className="meta">Loading…</p>}
+      {users.isPending && <Loader label="Loading accounts" />}
       {users.error && <Banner tone="error">{users.error.message}</Banner>}
 
       {users.data && filtered.length === 0 ? (

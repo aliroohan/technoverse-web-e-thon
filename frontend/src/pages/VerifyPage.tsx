@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
 import { Award, Clock, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Loader } from '../components/ui'
 import { formatWhen } from '../lib/format'
 import { ApiError, apiRequest } from '../lib/api-client'
 
@@ -26,7 +27,7 @@ export function VerifyPage() {
         <p className="meta" style={{ margin: 0 }}>Public verification</p>
         <h1 className="page-title">Holdfast</h1>
       </div>
-      {result.isPending && <p className="meta">Checking…</p>}
+      {result.isPending && <Loader label="Checking verification" />}
       {result.error && (
         <p className="banner error" role="alert">
           {result.error instanceof ApiError && result.error.status === 404

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Calendar, Clock, Eye, Play } from 'lucide-react'
-import { Button } from '../components/ui'
+import { Button, Loader } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 import type { CandidateExam } from '../types/domain'
@@ -21,7 +21,7 @@ export function CandidateHomePage() {
   return (
     <section className="stack">
       <h1 className="page-title">Your examinations</h1>
-      {exams.isPending && <p className="meta">Loading examinations…</p>}
+      {exams.isPending && <Loader label="Loading examinations" />}
       {exams.isError && (
         <div className="stack">
           <p className="banner error" role="alert">
@@ -53,8 +53,14 @@ export function CandidateHomePage() {
                   </div>
                   <div className="row">
                     {exam.canEnter && (
-                      <Button type="button" disabled={start.isPending} onClick={() => start.mutate(exam.id)}>
-                        <Play size={15} /> {start.isPending ? 'Starting…' : exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
+                      <Button
+                        type="button"
+                        loading={start.isPending && start.variables === exam.id}
+                        onClick={() => {
+                          if (!start.isPending) start.mutate(exam.id)
+                        }}
+                      >
+                        <Play size={15} /> {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
                       </Button>
                     )}
                     {exam.access === 'completed' && exam.resultsReady && exam.attemptId && (
