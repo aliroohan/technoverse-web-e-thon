@@ -33,22 +33,60 @@ export function Spinner({ size = 18 }: { size?: number }) {
         stroke="currentColor"
         strokeWidth="2.6"
         strokeLinecap="round"
-      />
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 12 12"
+          to="360 12 12"
+          dur="0.8s"
+          repeatCount="indefinite"
+        />
+      </path>
     </svg>
   )
 }
 
 export function Loader({ label = 'Loading', full = false }: { label?: string; full?: boolean }) {
+  const size = full ? 64 : 50
   return (
     <div className={full ? 'loader-stage full' : 'loader-stage'} role="status" aria-label={label}>
       <span className="sr-only">{label}</span>
-      <div className={full ? 'loader-halo full' : 'loader-halo'}>
-        <div className="loader-orb" aria-hidden="true">
-          <span className="loader-ring-outer" />
-          <span className="loader-ring-inner" />
-          <span className="loader-core" />
-        </div>
-      </div>
+      <svg
+        className="loader-svg"
+        width={size}
+        height={size}
+        viewBox="0 0 64 64"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="32" cy="32" r="22" stroke="rgba(28, 25, 21, 0.1)" strokeWidth="1.5" />
+        <g>
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 32 32"
+            to="360 32 32"
+            dur="1.25s"
+            repeatCount="indefinite"
+          />
+          <circle cx="32" cy="10" r="4.2" fill="var(--pine)" />
+          <circle cx="51.05" cy="43" r="3.8" fill="var(--brass)" />
+          <circle cx="12.95" cy="43" r="3.4" fill="var(--ink)" />
+        </g>
+        <g>
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="360 32 32"
+            to="0 32 32"
+            dur="1.7s"
+            repeatCount="indefinite"
+          />
+          <circle cx="32" cy="20" r="2.6" fill="var(--pine)" fillOpacity="0.65" />
+          <circle cx="32" cy="44" r="2.6" fill="var(--brass)" fillOpacity="0.65" />
+        </g>
+      </svg>
     </div>
   )
 }
