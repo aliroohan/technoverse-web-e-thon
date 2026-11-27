@@ -1,3 +1,4 @@
+import { Check, Upload, UserPlus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { apiRequest } from '../lib/api-client'
 import { candidateCsv, parseCandidateCsv, type CandidateRow } from '../lib/candidate-csv'
@@ -42,18 +43,21 @@ export function CandidateForm({ onCreated }: { onCreated: (person: CandidateCrea
   }
 
   return (
-    <form className="stack" onSubmit={(event) => void submit(event)}>
-      <Field label="Name">
-        <TextInput value={name} onChange={(event) => setName(event.target.value)} required />
-      </Field>
-      <Field label="Email">
-        <TextInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-      </Field>
-      <p className="meta">This creates an account. It does not place the person on an examination.</p>
+    <form className="stack compact-form" onSubmit={(event) => void submit(event)}>
+      <div className="compact-grid">
+        <Field label="Name">
+          <TextInput value={name} onChange={(event) => setName(event.target.value)} required />
+        </Field>
+        <Field label="Email">
+          <TextInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </Field>
+      </div>
       {error && <Banner tone="error">{error}</Banner>}
-      <Button type="submit" disabled={pending}>
-        Add candidate
-      </Button>
+      <div className="row" style={{ justifyContent: 'flex-end' }}>
+        <Button type="submit" className="btn-sm" disabled={pending}>
+          <UserPlus size={14} /> Add
+        </Button>
+      </div>
     </form>
   )
 }
@@ -95,7 +99,7 @@ export function CandidateImport({
 
   return (
     <div className="stack">
-      <p className="meta">Load a CSV with name and email columns. The rows stay here until you add them, and adding them does not enroll anyone.</p>
+      <p className="meta" style={{ margin: 0 }}>CSV columns: name, email</p>
       <Field label="CSV file">
         <input
           type="file"
@@ -106,10 +110,10 @@ export function CandidateImport({
           }}
         />
       </Field>
-      {skipped > 0 && <p className="meta">{skipped} {skipped === 1 ? 'row was' : 'rows were'} skipped because a name or email was missing.</p>}
+      {skipped > 0 && <p className="meta">{skipped} skipped</p>}
       {rows && (
         <>
-          <p className="meta">{rows.length} {rows.length === 1 ? 'candidate' : 'candidates'} ready to add.</p>
+          <p className="meta">{rows.length} ready</p>
           <ul className="list">
             {rows.map((row, index) => (
               <li className="card" key={`${row.email}-${index}`}>
@@ -118,15 +122,15 @@ export function CandidateImport({
               </li>
             ))}
           </ul>
-          <div className="row">
-            <Button type="button" disabled={pending} onClick={() => void add()}>
-              Add
-            </Button>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
             {onCancel && (
-              <Button type="button" variant="ghost" onClick={onCancel}>
-                Cancel
+              <Button type="button" variant="ghost" className="btn-icon" aria-label="Cancel" title="Cancel" onClick={onCancel}>
+                <X size={15} />
               </Button>
             )}
+            <Button type="button" className="btn-sm" disabled={pending} onClick={() => void add()}>
+              <Upload size={14} /> <Check size={14} /> Add ({rows.length})
+            </Button>
           </div>
         </>
       )}

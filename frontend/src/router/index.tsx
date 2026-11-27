@@ -15,6 +15,7 @@ import { CandidateHomePage } from '../pages/CandidateHomePage'
 import { CandidatesPage } from '../pages/CandidatesPage'
 import { ExamDeskPage } from '../pages/ExamDeskPage'
 import { ExamListPage } from '../pages/ExamListPage'
+import { ExaminerStudentPage } from '../pages/ExaminerStudentPage'
 import { ExamRunnerPage } from '../pages/ExamRunnerPage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -132,6 +133,13 @@ const candidatesRoute = createRoute({
   component: CandidatesPage,
 })
 
+const examinerStudentRoute = createRoute({
+  getParentRoute: () => dashboardRoute,
+  path: '/examiner/candidates/$candidateId',
+  beforeLoad: guard('examiner'),
+  component: ExaminerStudentPage,
+})
+
 const candidateRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/candidate',
@@ -166,6 +174,7 @@ const routeTree = rootRoute.addChildren([
       examDeskRoute,
       questionsRoute,
       candidatesRoute,
+      examinerStudentRoute,
       candidateRoute,
       resultRoute,
     ]),
