@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { useState } from 'react'
+import { VerifyShare } from '../components/VerifyShare'
 import { Area, Banner, Button, Field, Pagination, TextInput } from '../components/ui'
 import { apiRequest, downloadPdf } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
@@ -266,6 +267,7 @@ export function AdminResultPaperPage() {
           <ManageStudentResultPanel
             key={editing.attemptId ?? editing.candidateId}
             student={editing}
+            resultsPublished={exam.resultsPublished}
             onClose={() => setEditing(null)}
             onSaved={async (msg) => {
               setNotice({ tone: 'ok', text: msg })
@@ -388,11 +390,13 @@ export function AdminResultPaperPage() {
 
 function ManageStudentResultPanel({
   student,
+  resultsPublished,
   onClose,
   onSaved,
   onError,
 }: {
   student: StudentResultRow
+  resultsPublished: boolean
   onClose: () => void
   onSaved: (message: string) => Promise<void>
   onError: (message: string) => void
@@ -540,6 +544,9 @@ function ManageStudentResultPanel({
             Cancel
           </Button>
         </div>
+        {resultsPublished && student.gradingStatus === 'ready' && student.verification && !student.verification.revoked && (
+          <VerifyShare code={student.verification.code} />
+        )}
         {student.verification && (
           <Button type="button" variant="ghost" disabled={saving} onClick={() => void toggleVerification()}>
             {student.verification.revoked ? <ShieldCheck size={15} /> : <ShieldOff size={15} />}

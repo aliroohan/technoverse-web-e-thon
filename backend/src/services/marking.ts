@@ -7,6 +7,12 @@ export type MarkInput = {
   choiceIds: string[]
 }
 
+/** A paper with a written question stays hidden until the examiner has marked every one. */
+export const writtenAwaitingMark = (attempt: {
+  questionSnapshots: { type: string }[]
+  gradingStatus?: string | null
+}) => attempt.questionSnapshots.some((item) => item.type === 'written') && attempt.gradingStatus !== 'ready'
+
 /** Objective score. Written questions return null until a human grades them. */
 export const scoreObjective = (input: MarkInput): number | null => {
   if (input.type === 'written') return null

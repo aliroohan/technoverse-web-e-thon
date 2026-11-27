@@ -12,6 +12,7 @@ import type { ExamSettings, SessionUser } from '../types/domain.js'
 import { DIFFICULTY_WEIGHT } from '../types/domain.js'
 import { loadOwnedExam } from './access.js'
 import { lifecycleOf } from './lifecycle.js'
+import { writtenAwaitingMark } from './marking.js'
 import { buildSnapshots, describePaper } from './paper.js'
 
 const id = () => randomBytes(4).toString('hex')
@@ -304,6 +305,7 @@ export const listCandidateExams = async (user: SessionUser) => {
       reason,
       attemptId: attempt?._id.toString() ?? null,
       attemptStatus: attempt?.status ?? null,
+      resultsReady: Boolean(exam.resultsPublished && attempt && attempt.status !== 'in_progress' && !writtenAwaitingMark(attempt)),
     }
   })
 }

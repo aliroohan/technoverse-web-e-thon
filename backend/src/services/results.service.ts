@@ -2,7 +2,7 @@ import { Attempt, Enrollment, Exam, Grade, ReportVerification, User } from '../m
 import { HttpError } from '../lib/http-error.js'
 import type { SessionUser } from '../types/domain.js'
 import { loadOwnedExam } from './access.js'
-import { round2 } from './marking.js'
+import { round2, writtenAwaitingMark } from './marking.js'
 
 export const myResults = async (user: SessionUser) => {
   const attempts = await Attempt.find({
@@ -16,7 +16,7 @@ export const myResults = async (user: SessionUser) => {
   const codeByAttempt = new Map(codes.map((row) => [row.attemptId.toString(), row.code]))
 
   return attempts
-    .filter((attempt) => published.has(attempt.examId.toString()))
+    .filter((attempt) => published.has(attempt.examId.toString()) && !writtenAwaitingMark(attempt))
     .map((attempt) => {
       const exam = exams.find((item) => item._id.toString() === attempt.examId.toString())
       return {
@@ -41,6 +41,9 @@ export const resultDetail = async (user: SessionUser, attemptId: string) => {
   const isSelf = attempt.candidateId.toString() === user.id
   if (!isOwner && !isSelf) throw new HttpError(404, 'Result not found')
   if (isSelf && !exam.resultsPublished) throw new HttpError(403, 'Results have not been published')
+  if (isSelf && writtenAwaitingMark(attempt)) {
+    throw new HttpError(403, 'Your written answers have not been marked yet')
+  }
   if (user.role === 'examiner' && exam.examinerId.toString() !== user.id) {
     throw new HttpError(403, 'You cannot access this examination')
   }
@@ -59,7 +62,8 @@ export const resultDetail = async (user: SessionUser, attemptId: string) => {
     totalMarks: attempt.questionSnapshots.reduce((sum, item) => sum + item.marks, 0),
     submittedAt: attempt.submittedAt,
     teacherComment: attempt.teacherComment ?? '',
-    verificationCode: verification?.code ?? null,
+    verificationCode:
+      exam.resultsPublished && !writtenAwaitingMark(attempt) ? (verification?.code ?? null) : null,
     questions: attempt.questionSnapshots.map((snapshot) => {
       const grade = grades.find((item) => item.questionId === snapshot.questionId)
       return {

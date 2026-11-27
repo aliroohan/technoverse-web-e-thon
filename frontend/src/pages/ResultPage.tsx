@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
-import { Award, Clock, FileDown, MessageSquare, ShieldCheck } from 'lucide-react'
+import { Award, Clock, FileDown, MessageSquare } from 'lucide-react'
+import { VerifyShare } from '../components/VerifyShare'
 import { Button } from '../components/ui'
 import { apiRequest, downloadPdf } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
@@ -41,12 +42,7 @@ export function ResultPage() {
           <span className="meta-chip"><Clock size={14} /> {formatWhen(data.submittedAt)}</span>
         </div>
       </div>
-      {data.verificationCode && (
-        <p className="banner ok meta-chip">
-          <ShieldCheck size={16} />
-          <span>Verification code <strong>{data.verificationCode}</strong></span>
-        </p>
-      )}
+      {data.verificationCode && <VerifyShare code={data.verificationCode} />}
       {data.teacherComment && (
         <p className="banner meta-chip">
           <MessageSquare size={16} />
