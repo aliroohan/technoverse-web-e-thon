@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button } from '../components/ui'
 import {
   BookOpen,
   ClipboardList,
@@ -69,7 +70,26 @@ export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const user = me.data
-  if (!user) return null
+  if (me.isPending) {
+    return (
+      <main className="main stack">
+        <p className="meta">Loading workspace…</p>
+      </main>
+    )
+  }
+  if (me.isError || !user) {
+    return (
+      <main className="main stack">
+        <p className="banner error" role="alert">
+          {me.error instanceof Error ? me.error.message : 'Could not load your session.'}
+        </p>
+        <div className="row">
+          <Button type="button" onClick={() => void me.refetch()}>Retry</Button>
+          <Link className="btn-ghost" to="/login">Sign in</Link>
+        </div>
+      </main>
+    )
+  }
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -86,7 +106,11 @@ export function DashboardLayout() {
   const closeMobile = () => setMobileOpen(false)
 
   const logout = async () => {
-    await apiRequest('/auth/logout', { method: 'POST' })
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' })
+    } catch {
+      // ignore network errors on logout
+    }
     queryClient.setQueryData(['me'], null)
     await navigate({ to: '/login' })
   }

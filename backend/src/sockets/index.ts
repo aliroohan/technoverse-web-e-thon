@@ -39,6 +39,7 @@ export const createSocketServer = (httpServer: HttpServer) => {
 
     socket.on('attempt:join', (attemptId: string) => {
       if (typeof attemptId !== 'string') return
+      socket.data.attemptId = attemptId
       void socket.join(`attempt:${attemptId}`)
       if (socket.data.role === 'candidate') {
         void recordIncident(
@@ -51,6 +52,13 @@ export const createSocketServer = (httpServer: HttpServer) => {
 
     socket.on('disconnect', () => {
       logger.debug('Socket disconnected', { socketId: socket.id })
+      if (socket.data.role === 'candidate' && typeof socket.data.attemptId === 'string') {
+        void recordIncident(
+          { id: socket.data.userId as string, role: 'candidate', name: '', email: '' },
+          socket.data.attemptId,
+          'disconnect',
+        ).catch(() => undefined)
+      }
     })
   })
 

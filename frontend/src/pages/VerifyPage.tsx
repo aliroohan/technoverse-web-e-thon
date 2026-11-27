@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
 import { Award, Clock, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { formatWhen } from '../lib/format'
-import { apiRequest } from '../lib/api-client'
+import { ApiError, apiRequest } from '../lib/api-client'
 
 type Verification = {
   examTitle: string
@@ -27,7 +27,13 @@ export function VerifyPage() {
         <h1 className="page-title">Holdfast</h1>
       </div>
       {result.isPending && <p className="meta">Checking…</p>}
-      {result.error && <p className="banner error">No issued report matches that code.</p>}
+      {result.error && (
+        <p className="banner error" role="alert">
+          {result.error instanceof ApiError && result.error.status === 404
+            ? 'No issued report matches that code.'
+            : 'Could not verify this report right now. Please try again.'}
+        </p>
+      )}
       {result.data && (
         <article className="card stack">
           <div className="row" style={{ justifyContent: 'space-between' }}>

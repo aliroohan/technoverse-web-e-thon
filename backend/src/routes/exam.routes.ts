@@ -255,6 +255,7 @@ attemptRouter.put(
       choiceIds: z.array(z.string()).optional(),
       text: z.string().max(20000).optional(),
       flaggedForReview: z.boolean().optional(),
+      expectedVersion: z.number().int().min(0).optional(),
     }).parse(req.body)
     res.json({ success: true, data: await saveAnswer(asAuthed(req).user, String(req.params.id), body) })
   }),

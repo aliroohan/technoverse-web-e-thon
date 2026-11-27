@@ -2,7 +2,7 @@ import { Attempt, Enrollment, Exam, Grade, ReportVerification, User } from '../m
 import { HttpError } from '../lib/http-error.js'
 import type { SessionUser } from '../types/domain.js'
 import { loadOwnedExam } from './access.js'
-import { round2, writtenAwaitingMark } from './marking.js'
+import { round2, scoreObjective, writtenAwaitingMark } from './marking.js'
 
 export const myResults = async (user: SessionUser) => {
   const attempts = await Attempt.find({
@@ -132,7 +132,17 @@ export const questionAnalytics = async (user: SessionUser, examId: string) => {
 
   const grouped = new Map<
     string,
-    { stem: string; type: string; presented: number; skipped: number; incorrect: number; awarded: number[]; marks: number }
+    {
+      stem: string
+      type: string
+      presented: number
+      skipped: number
+      incorrect: number
+      awarded: number[]
+      marks: number
+      choiceText: Map<string, string>
+      misses: Map<string, number>
+    }
   >()
 
   for (const attempt of attempts) {
@@ -145,7 +155,10 @@ export const questionAnalytics = async (user: SessionUser, examId: string) => {
         incorrect: 0,
         awarded: [],
         marks: snapshot.marks,
+        choiceText: new Map<string, string>(),
+        misses: new Map<string, number>(),
       }
+      for (const choice of snapshot.choices ?? []) row.choiceText.set(choice.id, choice.text)
       row.presented += 1
       const answer = answers.find(
         (item) => item.attemptId.toString() === attempt.id && item.questionId === snapshot.questionId,
@@ -158,9 +171,20 @@ export const questionAnalytics = async (user: SessionUser, examId: string) => {
       else if (snapshot.type !== 'written') {
         const correct = new Set(snapshot.correctChoiceIds)
         const selected = answer?.choiceIds ?? []
-        const exact =
-          selected.length === correct.size && selected.every((choiceId) => correct.has(choiceId))
-        if (!exact) row.incorrect += 1
+        const earned =
+          scoreObjective({
+            type: snapshot.type,
+            correctChoiceIds: snapshot.correctChoiceIds,
+            marks: snapshot.marks,
+            choiceIds: selected,
+          }) ?? 0
+        const creditRatio = snapshot.marks > 0 ? Math.max(0, Math.min(1, earned / snapshot.marks)) : 0
+        if (creditRatio < 1) {
+          row.incorrect += 1 - creditRatio
+          for (const choiceId of selected) {
+            if (!correct.has(choiceId)) row.misses.set(choiceId, (row.misses.get(choiceId) ?? 0) + 1)
+          }
+        }
       } else {
         const grade = grades.find(
           (item) => item.attemptId.toString() === attempt.id && item.questionId === snapshot.questionId,
@@ -176,18 +200,26 @@ export const questionAnalytics = async (user: SessionUser, examId: string) => {
     notice: null,
     questions: [...grouped.entries()].map(([questionId, row]) => {
       const answered = row.presented - row.skipped
+      let commonMiss: { text: string; count: number } | null = null
+      for (const [choiceId, count] of row.misses) {
+        if (!commonMiss || count > commonMiss.count) {
+          commonMiss = { text: row.choiceText.get(choiceId) ?? 'Unknown choice', count }
+        }
+      }
       return {
         questionId,
         stem: row.stem,
         type: row.type,
+        marks: row.marks,
         presented: row.presented,
         skipped: row.skipped,
-        incorrect: row.type === 'written' ? null : row.incorrect,
+        incorrect: row.type === 'written' ? null : round2(row.incorrect),
         empiricalDifficulty: row.type === 'written' || answered === 0 ? null : round2(row.incorrect / answered),
         averageAwarded:
           row.type === 'written' && row.awarded.length
             ? round2(row.awarded.reduce((sum, value) => sum + value, 0) / row.awarded.length)
             : null,
+        commonMiss,
       }
     }),
   }

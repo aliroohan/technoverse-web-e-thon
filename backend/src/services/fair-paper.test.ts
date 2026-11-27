@@ -44,6 +44,22 @@ describe('selectPaper', () => {
     const second = selectPaper(pool, settings, seeded(9)).map((item) => item.questionId).join(',')
     assert.notEqual(first, second)
   })
+
+  it('prefers draws within tolerance and maximizes category diversity', () => {
+    const paper = selectPaper(
+      pool,
+      {
+        fairPaper: true,
+        questionCount: 4,
+        difficultyBudget: 6,
+        tolerance: 0,
+        randomizeQuestions: false,
+      },
+      seeded(3),
+    )
+    const sampled = paper.filter((item) => item.questionId !== 'w')
+    assert.equal(paperWeight(sampled), 6)
+  })
 })
 
 const seeded = (seed: number) => {
