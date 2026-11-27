@@ -4,16 +4,20 @@ import { useParams } from '@tanstack/react-router'
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock,
   FileEdit,
   Flag,
   LogOut,
+  Megaphone,
   Send,
   SlidersHorizontal,
   Wifi,
   WifiOff,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
@@ -97,6 +101,8 @@ function Runner({
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [lateNote, setLateNote] = useState('')
+  const [annExpanded, setAnnExpanded] = useState(false)
+  const [minimizedAnnCount, setMinimizedAnnCount] = useState<number | null>(null)
   const timers = useRef<Record<string, number>>({})
 
   const question = attempt.questions[index]
@@ -112,6 +118,7 @@ function Runner({
         const saved = await apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
           method: 'PUT',
           body: JSON.stringify(item),
+          silent: true,
         })
         setAnswers((prev) => {
           const cur = prev[saved.questionId]
@@ -131,9 +138,10 @@ function Runner({
   }, [attempt.id])
 
   useEffect(() => {
-    if (navigator.onLine && initial.status === 'in_progress' && readOutbox(attempt.id).length > 0) {
-      void flush()
-    }
+    const initialFlush =
+      navigator.onLine && initial.status === 'in_progress' && readOutbox(attempt.id).length > 0
+        ? window.setTimeout(() => void flush(), 0)
+        : undefined
     const clock = window.setInterval(() => setNow(Date.now()), 1000)
     const onOnline = () => {
       setOnline(true)
@@ -143,6 +151,7 @@ function Runner({
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
     return () => {
+      if (initialFlush !== undefined) window.clearTimeout(initialFlush)
       window.clearInterval(clock)
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
@@ -153,12 +162,13 @@ function Runner({
     const beat = window.setInterval(() => {
       void apiRequest<{ serverNow: string; deadlineAt: string; status: AttemptView['status'] }>(`/attempts/${attempt.id}/heartbeat`, {
         method: 'POST',
+        silent: true,
       })
         .then((pulse) => {
           setOffset(new Date(pulse.serverNow).getTime() - Date.now())
           setAttempt((current) => ({ ...current, deadlineAt: pulse.deadlineAt, status: pulse.status }))
           if (pulse.status !== 'in_progress') {
-            void apiRequest<AttemptView>(`/attempts/${attempt.id}`)
+            void apiRequest<AttemptView>(`/attempts/${attempt.id}`, { silent: true })
               .then((fresh) => {
                 setAttempt(fresh)
                 onAttempt(fresh)
@@ -186,10 +196,10 @@ function Runner({
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'blur' }), silent: true })
       }
       if (document.visibilityState === 'visible' && attempt.status === 'in_progress') {
-        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }) })
+        void apiRequest(`/attempts/${attempt.id}/incidents`, { method: 'POST', body: JSON.stringify({ type: 'focus' }), silent: true })
       }
     }
     document.addEventListener('visibilitychange', onHide)
@@ -214,6 +224,7 @@ function Runner({
       void apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
         method: 'PUT',
         body: JSON.stringify(payload),
+        silent: true,
       })
         .then((saved) => {
           setSaveState('saved')
@@ -233,6 +244,7 @@ function Runner({
             void apiRequest(`/attempts/${attempt.id}/incidents`, {
               method: 'POST',
               body: JSON.stringify({ type: 'autosave_failed' }),
+              silent: true,
             }).catch(() => undefined)
           }
         })
@@ -322,36 +334,64 @@ function Runner({
     [attempt.questions, flags],
   )
 
+  const answeredCount = attempt.questions.length - unansweredCount
+  const totalQuestions = attempt.questions.length
+  const progressPct = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0
+  const announcements = attempt.announcements
+  const latestAnnouncement = announcements[announcements.length - 1]
+  const olderAnnouncements = announcements.slice(0, -1).reverse()
+  const annMinimized = minimizedAnnCount === announcements.length
+  const hasNotices = !online || Boolean(lateNote) || announcements.length > 0 || attempt.status !== 'in_progress'
+  const syncTone =
+    !online || saveState === 'rejected' || saveState === 'failed'
+      ? 'sync-pill warn'
+      : saveState === 'saved'
+        ? 'sync-pill ok'
+        : 'sync-pill'
+
   return (
     <div className="runner" data-contrast={prefs.contrast} data-font={prefs.fontScale} data-nav={prefs.navigator}>
       <header className="runner-bar">
-        <div>
+        <div className="runner-brand">
           <strong>{attempt.examTitle}</strong>
-          {attempt.isSandbox && <div className="meta">Sandbox mode</div>}
+          {attempt.isSandbox && <span className="pill warn">Sandbox</span>}
         </div>
-        <div aria-live="polite">
-          <p className={urgent ? 'timer urgent meta-chip' : 'timer meta-chip'} role="timer">
-            <Clock size={20} />
-            {formatRemaining(remaining)}
+        <div className="runner-telemetry">
+          <div className={urgent ? 'timer-pill urgent' : 'timer-pill'} aria-live="polite">
+            <Clock size={17} />
+            <p className={urgent ? 'timer urgent' : 'timer'} role="timer">
+              {formatRemaining(remaining)}
+            </p>
+            {urgent && attempt.status === 'in_progress' && <span className="timer-urgent-tag">Ending soon</span>}
+          </div>
+          <p className={syncTone} role="status">
+            {!online ? (
+              <WifiOff size={14} />
+            ) : saveState === 'rejected' || saveState === 'failed' ? (
+              <AlertTriangle size={14} />
+            ) : saveState === 'saved' ? (
+              <Check size={14} />
+            ) : (
+              <Wifi size={14} />
+            )}
+            {statusLabel}
           </p>
-          {urgent && attempt.status === 'in_progress' && <p className="meta" style={{ margin: 0 }}>Ending soon</p>}
         </div>
-        <p className="meta meta-chip" role="status" style={{ margin: 0 }}>
-          {!online ? (
-            <WifiOff size={15} />
-          ) : saveState === 'rejected' || saveState === 'failed' ? (
-            <AlertTriangle size={15} />
-          ) : saveState === 'saved' ? (
-            <Check size={15} />
-          ) : (
-            <Wifi size={15} />
-          )}
-          {statusLabel}
-        </p>
         <div className="row">
+          {annMinimized && announcements.length > 0 && (
+            <button
+              type="button"
+              className="notice-chip-btn"
+              onClick={() => setMinimizedAnnCount(null)}
+              title="Show announcements"
+            >
+              <Megaphone size={13} /> {announcements.length}
+            </button>
+          )}
           <Button
             type="button"
             variant="ghost"
+            aria-expanded={scratchOpen}
             onClick={() => {
               setPrefsOpen(false)
               setConfirming(false)
@@ -363,6 +403,7 @@ function Runner({
           <Button
             type="button"
             variant="ghost"
+            aria-expanded={prefsOpen}
             onClick={() => {
               setScratchOpen(false)
               setConfirming(false)
@@ -389,76 +430,186 @@ function Runner({
           )}
         </div>
       </header>
-      {!online && (
-        <Banner>Offline — new answers stay queued locally; deadline does not pause.</Banner>
-      )}
-      {lateNote && <Banner tone="error">{lateNote}</Banner>}
-      {attempt.announcements.map((announcement) => (
-        <Banner key={announcement.id}>{announcement.body}</Banner>
-      ))}
-      {attempt.status !== 'in_progress' && (
-        <Banner tone="ok">Attempt {attempt.status}.</Banner>
+      {hasNotices && !(
+        online &&
+        !lateNote &&
+        attempt.status === 'in_progress' &&
+        annMinimized
+      ) && (
+        <div className="runner-notices">
+          {latestAnnouncement && !annMinimized && (
+            <div className={`runner-notice-bar announcement${annExpanded ? ' expanded' : ''}`} role="status">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="runner-notice-main">
+                  <span className="runner-notice-icon" aria-hidden="true">
+                    <Megaphone size={13} />
+                  </span>
+                  <p className="runner-notice-text" title={latestAnnouncement.body}>
+                    {latestAnnouncement.body}
+                  </p>
+                </div>
+                {annExpanded && olderAnnouncements.length > 0 && (
+                  <div className="runner-notice-history">
+                    {olderAnnouncements.map((item) => (
+                      <p key={item.id}>{item.body}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="runner-notice-actions">
+                {olderAnnouncements.length > 0 && (
+                  <button
+                    type="button"
+                    className="notice-chip-btn"
+                    onClick={() => setAnnExpanded((value) => !value)}
+                  >
+                    {annExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    {annExpanded ? 'Less' : `+${olderAnnouncements.length} earlier`}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="notice-chip-btn"
+                  aria-label="Hide announcement bar"
+                  onClick={() => {
+                    setAnnExpanded(false)
+                    setMinimizedAnnCount(announcements.length)
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          )}
+          {!online && (
+            <div className="runner-notice-bar">
+              <span>Offline — new answers stay queued locally; deadline does not pause.</span>
+            </div>
+          )}
+          {lateNote && (
+            <div className="runner-notice-bar error">
+              <span>{lateNote}</span>
+            </div>
+          )}
+          {attempt.status !== 'in_progress' && (
+            <div className="runner-notice-bar ok">
+              <span>Attempt {attempt.status}.</span>
+            </div>
+          )}
+        </div>
       )}
       <div className="runner-body">
         {question && (
           <article className="question-card">
-            <p className="meta">Question {index + 1} / {attempt.questions.length} · {question.marks} pts · {question.type}</p>
-            <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 520, fontSize: '1.8rem' }}>{question.stem}</h1>
+            <div className="q-card-head">
+              <div className="q-card-meta">
+                <span className="q-num-pill">
+                  Question {index + 1} / {totalQuestions}
+                </span>
+                <span className="pill">{question.marks} {question.marks === 1 ? 'pt' : 'pts'}</span>
+                <span className="pill">
+                  {question.type === 'single' ? 'Single choice' : question.type === 'multi' ? 'Multiple choice' : 'Written'}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                className={flags[question.questionId] ? 'flag-btn-active' : undefined}
+                aria-pressed={Boolean(flags[question.questionId])}
+                onClick={toggleFlag}
+              >
+                <Flag size={15} /> {flags[question.questionId] ? 'Marked for review' : 'Mark review'}
+              </Button>
+            </div>
+            <h1 className="q-card-stem">{question.stem}</h1>
             {question.type === 'written' ? (
               <label>
                 Response
-                <textarea value={answers[question.questionId]?.text ?? ''} onChange={(event) => updateText(event.target.value)} disabled={attempt.status !== 'in_progress'} />
+                <textarea
+                  className="q-textarea"
+                  placeholder="Write your answer here…"
+                  value={answers[question.questionId]?.text ?? ''}
+                  onChange={(event) => updateText(event.target.value)}
+                  disabled={attempt.status !== 'in_progress'}
+                />
               </label>
             ) : (
-              question.choices.map((choice) => (
-                <label className="choice" key={choice.id}>
-                  <input
-                    type={question.type === 'single' ? 'radio' : 'checkbox'}
-                    name={question.questionId}
-                    checked={(answers[question.questionId]?.choiceIds ?? []).includes(choice.id)}
-                    onChange={() => updateChoice(choice.id)}
-                    disabled={attempt.status !== 'in_progress'}
-                  />
-                  <span>{choice.text}</span>
-                </label>
-              ))
+              <div className="q-choices">
+                {question.choices.map((choice, choiceIndex) => {
+                  const checked = (answers[question.questionId]?.choiceIds ?? []).includes(choice.id)
+                  return (
+                    <label className={checked ? 'choice selected' : 'choice'} key={choice.id}>
+                      <input
+                        type={question.type === 'single' ? 'radio' : 'checkbox'}
+                        name={question.questionId}
+                        checked={checked}
+                        onChange={() => updateChoice(choice.id)}
+                        disabled={attempt.status !== 'in_progress'}
+                      />
+                      <span className="choice-letter">{String.fromCharCode(65 + choiceIndex)}</span>
+                      <span>{choice.text}</span>
+                    </label>
+                  )
+                })}
+              </div>
             )}
-            <div className="row" style={{ marginTop: '1rem' }}>
+            <div className="q-card-foot">
               <Button type="button" variant="ghost" onClick={() => setIndex((value) => Math.max(0, value - 1))} disabled={index === 0}>
                 <ChevronLeft size={15} /> Previous
               </Button>
-              <Button type="button" variant="ghost" onClick={toggleFlag}>
-                <Flag size={15} /> {flags[question.questionId] ? 'Unmark' : 'Review'}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setIndex((value) => Math.min(attempt.questions.length - 1, value + 1))} disabled={index === attempt.questions.length - 1}>
+              <span className="meta">
+                {index + 1} of {totalQuestions}
+              </span>
+              <Button type="button" variant="ghost" onClick={() => setIndex((value) => Math.min(totalQuestions - 1, value + 1))} disabled={index === totalQuestions - 1}>
                 Next <ChevronRight size={15} />
               </Button>
             </div>
           </article>
         )}
-        <nav className="palette" aria-label="Questions">
-          {attempt.questions.map((item, itemIndex) => {
-            const answer = answers[item.questionId]
-            const answered = item.type === 'written' ? Boolean(answer?.text.trim()) : (answer?.choiceIds.length ?? 0) > 0
-            return (
-              <button
-                key={item.questionId}
-                type="button"
-                className={`${answered ? 'answered' : ''} ${flags[item.questionId] ? 'review' : ''} ${itemIndex === index ? 'current' : ''}`}
-                aria-current={itemIndex === index ? 'true' : undefined}
-                aria-label={`Question ${itemIndex + 1}${answered ? ', answered' : ', unanswered'}${flags[item.questionId] ? ', marked for review' : ''}`}
-                onClick={() => setIndex(itemIndex)}
-              >
-                {itemIndex + 1}
-              </button>
-            )
-          })}
-        </nav>
+        <aside className="palette-panel" aria-label="Question navigator">
+          <div className="palette-head">
+            <strong>Questions</strong>
+            <span className={answeredCount === totalQuestions && totalQuestions > 0 ? 'pill ok' : 'pill'}>
+              {answeredCount}/{totalQuestions} done
+            </span>
+          </div>
+          <div className="palette-progress" aria-hidden="true">
+            <span style={{ width: `${progressPct}%` }} />
+          </div>
+          <nav className="palette" aria-label="Questions">
+            {attempt.questions.map((item, itemIndex) => {
+              const answer = answers[item.questionId]
+              const answered = item.type === 'written' ? Boolean(answer?.text.trim()) : (answer?.choiceIds.length ?? 0) > 0
+              return (
+                <button
+                  key={item.questionId}
+                  type="button"
+                  className={`${answered ? 'answered' : ''} ${flags[item.questionId] ? 'review' : ''} ${itemIndex === index ? 'current' : ''}`}
+                  aria-current={itemIndex === index ? 'true' : undefined}
+                  aria-label={`Question ${itemIndex + 1}${answered ? ', answered' : ', unanswered'}${flags[item.questionId] ? ', marked for review' : ''}`}
+                  onClick={() => setIndex(itemIndex)}
+                >
+                  {itemIndex + 1}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="palette-legend">
+            <span><i className="swatch current" /> Current</span>
+            <span><i className="swatch answered" /> Answered</span>
+            <span><i className="swatch review" /> Review{flaggedCount > 0 ? ` (${flaggedCount})` : ''}</span>
+          </div>
+        </aside>
       </div>
       {scratchOpen && (
         <aside className="drawer">
-          <h2>Scratchpad</h2>
-          <p className="meta">Rough work only — not graded.</p>
+          <div className="drawer-head">
+            <h2>Scratchpad</h2>
+            <button type="button" className="btn-icon" aria-label="Close scratchpad" onClick={() => setScratchOpen(false)}>
+              <X size={16} />
+            </button>
+          </div>
+          <p className="meta" style={{ margin: 0 }}>Rough work only — not graded.</p>
           {scratchError && <Banner tone="error">{scratchError}</Banner>}
           <textarea
             value={scratchpad}
@@ -469,7 +620,7 @@ function Runner({
               setScratchError('')
               window.clearTimeout(timers.current.scratch)
               timers.current.scratch = window.setTimeout(() => {
-                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }) })
+                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }), silent: true })
                   .catch((error: Error) => {
                     setScratchError(error.message || 'Could not save scratchpad')
                   })
@@ -480,7 +631,12 @@ function Runner({
       )}
       {prefsOpen && (
         <aside className="drawer">
-          <h2>Workspace</h2>
+          <div className="drawer-head">
+            <h2>Workspace</h2>
+            <button type="button" className="btn-icon" aria-label="Close workspace settings" onClick={() => setPrefsOpen(false)}>
+              <X size={16} />
+            </button>
+          </div>
           {prefsError && <Banner tone="error">{prefsError}</Banner>}
           <label>
             Type size
@@ -508,9 +664,14 @@ function Runner({
       )}
       {confirming && (
         <aside className="drawer">
-          <h2>Submit this attempt?</h2>
-          <p>You can submit once. Unanswered questions stay blank.</p>
-          <p className="meta">
+          <div className="drawer-head">
+            <h2>Submit this attempt?</h2>
+            <button type="button" className="btn-icon" aria-label="Close submit confirmation" disabled={submitting} onClick={() => setConfirming(false)}>
+              <X size={16} />
+            </button>
+          </div>
+          <p style={{ margin: 0 }}>You can submit once. Unanswered questions stay blank.</p>
+          <p className="meta" style={{ margin: 0 }}>
             {unansweredCount} unanswered · {flaggedCount} marked for review
           </p>
           {submitError && <Banner tone="error">{submitError}</Banner>}

@@ -20,7 +20,7 @@ import {
 import { useState } from 'react'
 import { VerifyShare } from '../components/VerifyShare'
 import { Area, Banner, Button, Field, Pagination, TextInput } from '../components/ui'
-import { apiRequest, downloadPdf } from '../lib/api-client'
+import { apiRequest, downloadPdf, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 import type { ExamSummary } from '../types/domain'
 
@@ -118,13 +118,11 @@ export function AdminResultPaperPage() {
         body: JSON.stringify({ published }),
       }),
     onSuccess: async (_data, published) => {
-      setNotice({
-        tone: 'ok',
-        text: published ? 'Results published.' : 'Results unpublished.',
-      })
+      notifySuccess(published ? 'Results published.' : 'Results unpublished.')
+      setNotice(null)
       await refresh()
     },
-    onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
+    onError: (error: Error) => notifyError(error.message),
   })
 
   if (detail.isPending) return <p className="meta">Loading…</p>
@@ -270,11 +268,12 @@ export function AdminResultPaperPage() {
             resultsPublished={exam.resultsPublished}
             onClose={() => setEditing(null)}
             onSaved={async (msg) => {
-              setNotice({ tone: 'ok', text: msg })
+              notifySuccess(msg)
+              setNotice(null)
               setEditing(null)
               await refresh()
             }}
-            onError={(msg) => setNotice({ tone: 'error', text: msg })}
+            onError={(msg) => notifyError(msg)}
           />
         )}
 
