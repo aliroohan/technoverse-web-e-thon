@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Award, Check, Layers, Pencil, Plus, Search, Tag, Trash2, X } from 'lucide-react'
+import { Award, Check, Layers, Pencil, Plus, Search, Tag, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
 import { Banner, Button, Select, TextInput } from '../components/ui'
@@ -77,23 +77,18 @@ export function QuestionBankPage() {
             </span>
           </div>
         </div>
-        <Button
-          type="button"
-          variant={formOpen ? 'ghost' : 'solid'}
-          onClick={() => {
-            if (formOpen) {
-              setFormMode('closed')
-              setEditing(null)
-            } else {
+        {!formOpen && (
+          <Button
+            type="button"
+            onClick={() => {
               setEditing(null)
               setFormMode('create')
               setNotice(null)
-            }
-          }}
-        >
-          {formOpen ? <X size={16} /> : <Plus size={16} />}
-          {formOpen ? 'Close' : 'New question'}
-        </Button>
+            }}
+          >
+            <Plus size={16} /> New question
+          </Button>
+        )}
       </div>
 
       {notice && <Banner tone={notice.tone}>{notice.text}</Banner>}
