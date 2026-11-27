@@ -1063,20 +1063,177 @@ textarea:focus {
 .login {
   min-height: 100svh;
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1.15fr 0.85fr;
 }
 .login-hero {
-  padding: 3rem;
+  position: relative;
+  overflow: hidden;
+  padding: 2.5rem 3rem 4.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  background:
-    linear-gradient(160deg, rgba(28, 25, 21, 0.08), transparent 40%),
-    var(--paper);
+  justify-content: space-between;
+  gap: 1.25rem;
+  background: var(--paper);
 }
-.login-hero h1 { font-family: var(--serif); font-size: clamp(3rem, 6vw, 5.2rem); line-height: 0.95; margin: 0; font-weight: 520; }
-.login-panel { display: grid; place-items: center; padding: 2rem; background: var(--paper-2); border-left: 1px solid var(--line); }
-.login-panel form { width: min(420px, 100%); }
+.login-art-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.login-hero-top,
+.login-bridge-stage,
+.login-hero-foot {
+  position: relative;
+  z-index: 1;
+}
+.login-bridge-stage {
+  position: relative;
+  width: 100%;
+  max-width: 740px;
+  height: 280px;
+  margin: auto;
+}
+.login-bridge-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bridge-flow-line {
+  animation: bridgeFlow 18s linear infinite;
+}
+.bridge-node {
+  position: absolute;
+  transform: translate(-50%, -32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: center;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bridge-node-1 {
+  left: 24.05%;
+  top: 32.85%;
+  animation: nodeFloat 6s ease-in-out infinite;
+}
+.bridge-node-2 {
+  left: 50%;
+  top: 43.57%;
+  animation: nodeFloat 6s ease-in-out 0.9s infinite;
+}
+.bridge-node-3 {
+  left: 75.95%;
+  top: 66.43%;
+  animation: nodeFloat 6s ease-in-out 1.8s infinite;
+}
+.bridge-orb {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 30px rgba(28, 25, 21, 0.16), 0 0 0 6px rgba(255, 253, 248, 0.72);
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 240ms ease;
+}
+.bridge-node:hover .bridge-orb {
+  transform: scale(1.1) translateY(-3px);
+  box-shadow: 0 18px 36px rgba(28, 25, 21, 0.22), 0 0 0 8px rgba(255, 253, 248, 0.9);
+}
+.orb-sage {
+  background: linear-gradient(145deg, var(--pine-soft) 0%, #c1dfcd 100%);
+  color: var(--pine);
+  border: 1px solid rgba(30, 92, 64, 0.25);
+}
+.orb-pine {
+  background: linear-gradient(145deg, #277351 0%, var(--pine) 100%);
+  color: var(--paper-2);
+}
+.orb-ink {
+  background: linear-gradient(145deg, #2d2822 0%, var(--ink) 100%);
+  color: var(--paper-2);
+}
+.bridge-label {
+  font-size: 0.96rem;
+  font-weight: 560;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+@keyframes bridgeFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -280; }
+}
+@keyframes nodeFloat {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -5px; }
+}
+.login-hero h1 { font-family: var(--serif); font-size: clamp(2.8rem, 5.2vw, 4.5rem); line-height: 0.96; margin: 0; font-weight: 520; letter-spacing: -0.03em; }
+.login-panel {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 2.25rem;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(228, 242, 234, 0.55), transparent 44%),
+    radial-gradient(circle at 14% 88%, rgba(246, 237, 217, 0.55), transparent 44%),
+    var(--paper-2);
+  border-left: 1px solid var(--line);
+}
+.login-panel-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: min(410px, 100%);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 2rem 2.1rem 1.75rem;
+  box-shadow: 0 22px 50px rgba(28, 25, 21, 0.08);
+  animation: panelReveal 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.login-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+.login-crest {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--pine-soft), #cde6d7);
+  border: 1px solid rgba(30, 92, 64, 0.25);
+  color: var(--pine);
+  display: grid;
+  place-items: center;
+}
+.login-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-top: 0.85rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(221, 212, 196, 0.7);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
 
 .runner {
   min-height: 100svh;
@@ -1331,7 +1488,10 @@ tbody tr:last-child td {
   }
   .main { width: calc(100% - 1.5rem); padding: 1.25rem 0 2.5rem; }
   .grid.two, .compact-grid, .qform-meta-grid, .login, .runner-body { grid-template-columns: 1fr; }
-  .login-hero { min-height: 28vh; padding: 1.5rem; }
+  .login-hero { min-height: 36vh; padding: 1.75rem 1.5rem; }
+  .login-bridge-stage { height: 220px; }
+  .bridge-orb { width: 50px; height: 50px; }
+  .bridge-label { font-size: 0.84rem; }
   .login-panel { border-left: 0; border-top: 1px solid var(--line); }
   .runner-bar { flex-wrap: wrap; gap: 0.65rem; }
   .admin-header { flex-wrap: wrap; gap: 0.75rem; }
