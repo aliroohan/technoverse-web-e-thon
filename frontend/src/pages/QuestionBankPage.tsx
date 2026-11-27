@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Award, Check, Layers, Pencil, Plus, Search, Tag, Trash2, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
-import { Banner, Button, Field, Select, TextInput } from '../components/ui'
+import { Banner, Button, Field, Loader, Select, TextInput } from '../components/ui'
 import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import type { Question } from '../types/domain'
 
@@ -155,7 +155,8 @@ export function QuestionBankPage() {
             <Button type="button" variant="ghost" onClick={() => setFormMode('closed')}>Cancel</Button>
             <Button
               type="button"
-              disabled={importing || !importContent.trim()}
+              loading={importing}
+              disabled={!importContent.trim()}
               onClick={async () => {
                 setImporting(true)
                 setImportErrors([])
@@ -181,7 +182,7 @@ export function QuestionBankPage() {
                 }
               }}
             >
-              <Upload size={15} /> {importing ? 'Importing…' : 'Import questions'}
+              <Upload size={15} /> Import questions
             </Button>
           </div>
         </div>
@@ -250,7 +251,7 @@ export function QuestionBankPage() {
         </Select>
       </div>
 
-      {questions.isPending && <p className="meta">Loading…</p>}
+      {questions.isPending && <Loader label="Loading questions" />}
       {questions.error && <Banner tone="error">{questions.error.message}</Banner>}
 
       {questions.data && filtered.length === 0 ? (
@@ -292,7 +293,7 @@ export function QuestionBankPage() {
                     className="btn-icon"
                     aria-label={`Delete ${question.stem}`}
                     title="Delete"
-                    disabled={remove.isPending && remove.variables === question.id}
+                    loading={remove.isPending && remove.variables === question.id}
                     onClick={() => remove.mutate(question.id)}
                   >
                     <Trash2 size={15} />

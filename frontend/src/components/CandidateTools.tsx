@@ -54,7 +54,7 @@ export function CandidateForm({ onCreated }: { onCreated: (person: CandidateCrea
       </div>
       {error && <Banner tone="error">{error}</Banner>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
-        <Button type="submit" className="btn-sm" disabled={pending}>
+        <Button type="submit" className="btn-sm" loading={pending}>
           <UserPlus size={14} /> Add
         </Button>
       </div>
@@ -159,7 +159,7 @@ export function CandidateImport({
                 <X size={15} />
               </Button>
             )}
-            <Button type="button" className="btn-sm" disabled={pending} onClick={() => void add()}>
+            <Button type="button" className="btn-sm" loading={pending} onClick={() => void add()}>
               <Upload size={14} /> <Check size={14} /> Add ({rows.length})
             </Button>
           </div>

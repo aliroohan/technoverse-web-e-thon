@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Award, ChevronRight, Clock, FileText, Search, User, Users } from 'lucide-react'
 import { useState } from 'react'
-import { Banner, Button, Pagination, Select, TextInput } from '../components/ui'
+import { Banner, Button, Loader, Pagination, Select, TextInput } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 import type { ExamSummary } from '../types/domain'
@@ -104,7 +104,7 @@ export function AdminStudentLogPage() {
         </div>
       </form>
 
-      {papers.isPending && <p className="meta">Loading…</p>}
+      {papers.isPending && <Loader label="Loading student logs" />}
       {papers.error && <Banner tone="error">{papers.error.message}</Banner>}
 
       {papers.data && papers.data.items.length === 0 && <Banner>No matching question papers.</Banner>}

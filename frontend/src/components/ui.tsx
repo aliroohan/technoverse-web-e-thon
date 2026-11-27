@@ -17,15 +17,64 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
+export function Spinner({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      className="spinner-icon"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeOpacity="0.22" strokeWidth="2.5" />
+      <path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function Loader({ label = 'Loading', full = false }: { label?: string; full?: boolean }) {
+  return (
+    <div className={full ? 'loader-stage full' : 'loader-stage'} role="status" aria-label={label}>
+      <span className="sr-only">{label}</span>
+      <div className={full ? 'loader-halo' : undefined}>
+        <div className="loader-orb" aria-hidden="true">
+          <span className="loader-ring-outer" />
+          <span className="loader-ring-inner" />
+          <span className="loader-core" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Button({
   variant = 'solid',
   block = false,
+  loading = false,
+  disabled,
   className,
+  children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'solid' | 'ghost' | 'danger'; block?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'solid' | 'ghost' | 'danger'
+  block?: boolean
+  loading?: boolean
+}) {
   const variantClass = variant === 'ghost' ? 'btn-ghost' : variant === 'danger' ? 'btn-danger' : 'btn'
-  const classes = [variantClass, block ? 'btn-block' : '', className].filter(Boolean).join(' ')
-  return <button className={classes} {...props} />
+  const classes = [variantClass, block ? 'btn-block' : '', loading ? 'is-loading' : '', className]
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <button className={classes} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>
+      <span className="btn-content">{children}</span>
+      {loading && (
+        <span className="btn-spinner" aria-hidden="true">
+          <Spinner size={16} />
+        </span>
+      )}
+    </button>
+  )
 }
 
 export function Field({
