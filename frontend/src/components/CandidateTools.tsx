@@ -70,12 +70,40 @@ export function CandidateImport({
   onCancel?: () => void
 }) {
   const [rows, setRows] = useState<CandidateRow[] | null>(null)
+  const [rawJson, setRawJson] = useState<string | null>(null)
   const [skipped, setSkipped] = useState(0)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
 
   const loadFile = async (file: File) => {
-    const parsed = parseCandidateCsv(await file.text())
+    const text = await file.text()
+    if (file.name.toLowerCase().endsWith('.json')) {
+      try {
+        const parsed = JSON.parse(text) as unknown
+        if (!Array.isArray(parsed)) {
+          setError('JSON file must contain an array of { name, email } objects')
+          setRows(null)
+          setRawJson(null)
+          return
+        }
+        const valid = parsed
+          .filter((item): item is { name: string; email: string } =>
+            Boolean(item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string' && typeof (item as { email?: unknown }).email === 'string'),
+          )
+          .map((item) => ({ name: item.name.trim(), email: item.email.trim() }))
+        setRows(valid.length ? valid : null)
+        setRawJson(valid.length ? text : null)
+        setSkipped(parsed.length - valid.length)
+        setError(valid.length ? '' : 'No valid { name, email } rows found in JSON')
+      } catch {
+        setError('Invalid JSON file')
+        setRows(null)
+        setRawJson(null)
+      }
+      return
+    }
+    const parsed = parseCandidateCsv(text)
+    setRawJson(null)
     setRows(parsed.rows.length ? parsed.rows : null)
     setSkipped(parsed.skipped)
     setError(parsed.error)
@@ -88,22 +116,25 @@ export function CandidateImport({
     try {
       const result = await apiRequest<CandidateImportResult>('/candidates/import', {
         method: 'POST',
-        body: JSON.stringify({ format: 'csv', content: candidateCsv(rows) }),
+        body: JSON.stringify(
+          rawJson ? { format: 'json', content: rawJson } : { format: 'csv', content: candidateCsv(rows) },
+        ),
       })
       onAdded(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add the candidates')
+    } finally {
       setPending(false)
     }
   }
 
   return (
     <div className="stack">
-      <p className="meta" style={{ margin: 0 }}>CSV columns: name, email</p>
-      <Field label="CSV file">
+      <p className="meta" style={{ margin: 0 }}>CSV (name, email) or JSON array</p>
+      <Field label="CSV or JSON file">
         <input
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.json,application/json"
           onChange={(event) => {
             const file = event.target.files?.[0]
             if (file) void loadFile(file)

@@ -87,7 +87,16 @@ export const listExaminerStudents = async (actor: SessionUser) => {
     attemptsByCandidate.set(cid, list)
   }
 
-  return candidates.map((candidate) => {
+  const scopedCandidateIds = new Set([
+    ...enrollments.map((row) => row.candidateId.toString()),
+    ...attempts.map((attempt) => attempt.candidateId.toString()),
+  ])
+  const visibleCandidates =
+    actor.role === 'admin'
+      ? candidates
+      : candidates.filter((candidate) => scopedCandidateIds.has(candidate._id.toString()))
+
+  return visibleCandidates.map((candidate) => {
     const cid = candidate._id.toString()
     const mine = attemptsByCandidate.get(cid) ?? []
     const uncheckedCount = mine.filter(

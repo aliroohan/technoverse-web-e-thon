@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
 import { Award, Clock, FileDown, MessageSquare } from 'lucide-react'
+import { useState } from 'react'
 import { VerifyShare } from '../components/VerifyShare'
-import { Button } from '../components/ui'
+import { Banner, Button } from '../components/ui'
 import { apiRequest, downloadPdf } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
@@ -22,15 +23,29 @@ type Result = {
 
 export function ResultPage() {
   const { attemptId } = useParams({ strict: false }) as { attemptId: string }
+  const [pdfError, setPdfError] = useState('')
+  const [downloading, setDownloading] = useState(false)
   const result = useQuery({
     queryKey: ['result', attemptId],
     queryFn: () => apiRequest<Result>(`/results/${attemptId}`),
   })
 
   if (result.isPending) return <p className="meta">Loading…</p>
-  if (result.error) return <p className="banner error">{result.error.message}</p>
+  if (result.error) return <p className="banner error" role="alert">{result.error.message}</p>
   const data = result.data
   if (!data) return null
+
+  const onDownload = async () => {
+    setPdfError('')
+    setDownloading(true)
+    try {
+      await downloadPdf(`/reports/${data.attemptId}/pdf`, `holdfast-${data.attemptId}.pdf`)
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'Could not download PDF report')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <article className="stack">
@@ -60,8 +75,9 @@ export function ResultPage() {
           </li>
         ))}
       </ul>
-      <Button type="button" onClick={() => void downloadPdf(`/reports/${data.attemptId}/pdf`, `holdfast-${data.attemptId}.pdf`)}>
-        <FileDown size={15} /> Download PDF
+      {pdfError && <Banner tone="error">{pdfError}</Banner>}
+      <Button type="button" disabled={downloading} onClick={() => void onDownload()}>
+        <FileDown size={15} /> {downloading ? 'Downloading…' : 'Download PDF'}
       </Button>
     </article>
   )

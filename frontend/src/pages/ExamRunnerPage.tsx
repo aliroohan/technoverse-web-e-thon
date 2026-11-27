@@ -63,17 +63,39 @@ function Runner({
   const queryClient = useQueryClient()
   const [attempt, setAttempt] = useState(initial)
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState(() => Object.fromEntries(initial.questions.map((question) => [question.questionId, question.answer])))
-  const [flags, setFlags] = useState(() => Object.fromEntries(initial.questions.map((question) => [question.questionId, question.flaggedForReview])))
-  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [answers, setAnswers] = useState(() => {
+    const base = Object.fromEntries(initial.questions.map((question) => [question.questionId, question.answer]))
+    for (const queued of readOutbox(initial.id)) {
+      const current = base[queued.questionId] ?? { choiceIds: [], text: '', savedAt: null, version: 0 }
+      base[queued.questionId] = {
+        ...current,
+        choiceIds: queued.choiceIds ?? current.choiceIds,
+        text: queued.text ?? current.text,
+      }
+    }
+    return base
+  })
+  const [flags, setFlags] = useState(() => {
+    const base = Object.fromEntries(initial.questions.map((question) => [question.questionId, question.flaggedForReview]))
+    for (const queued of readOutbox(initial.id)) {
+      if (queued.flaggedForReview !== undefined) {
+        base[queued.questionId] = queued.flaggedForReview
+      }
+    }
+    return base
+  })
+  const [saveState, setSaveState] = useState<SaveState>(() => (readOutbox(initial.id).length > 0 ? 'failed' : 'idle'))
   const [online, setOnline] = useState(navigator.onLine)
   const [offset, setOffset] = useState(() => new Date(initial.serverNow).getTime() - Date.now())
   const [now, setNow] = useState(() => Date.now())
   const [scratchpad, setScratchpad] = useState(initial.scratchpad)
+  const [scratchError, setScratchError] = useState('')
   const [scratchOpen, setScratchOpen] = useState(false)
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [prefs, setPrefs] = useState(preferences)
   const [confirming, setConfirming] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [lateNote, setLateNote] = useState('')
   const timers = useRef<Record<string, number>>({})
 
@@ -83,10 +105,19 @@ function Runner({
 
   const flush = useCallback(async () => {
     const queued = readOutbox(attempt.id)
+    if (queued.length === 0) return
     const kept: OutboxItem[] = []
     for (const item of queued) {
       try {
-        await apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(item) })
+        const saved = await apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
+          method: 'PUT',
+          body: JSON.stringify(item),
+        })
+        setAnswers((prev) => {
+          const cur = prev[saved.questionId]
+          if (!cur) return prev
+          return { ...prev, [saved.questionId]: { ...cur, version: saved.version, savedAt: saved.savedAt } }
+        })
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
           setLateNote(error.message)
@@ -96,10 +127,13 @@ function Runner({
       }
     }
     writeOutbox(attempt.id, kept)
-    if (kept.length === 0) setSaveState('saved')
+    setSaveState(kept.length === 0 ? 'saved' : 'failed')
   }, [attempt.id])
 
   useEffect(() => {
+    if (navigator.onLine && initial.status === 'in_progress' && readOutbox(attempt.id).length > 0) {
+      void flush()
+    }
     const clock = window.setInterval(() => setNow(Date.now()), 1000)
     const onOnline = () => {
       setOnline(true)
@@ -113,22 +147,26 @@ function Runner({
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
     }
-  }, [attempt.id, flush])
+  }, [attempt.id, flush, initial.status])
 
   useEffect(() => {
     const beat = window.setInterval(() => {
       void apiRequest<{ serverNow: string; deadlineAt: string; status: AttemptView['status'] }>(`/attempts/${attempt.id}/heartbeat`, {
         method: 'POST',
-      }).then((pulse) => {
-        setOffset(new Date(pulse.serverNow).getTime() - Date.now())
-        setAttempt((current) => ({ ...current, deadlineAt: pulse.deadlineAt, status: pulse.status }))
-        if (pulse.status !== 'in_progress') {
-          void apiRequest<AttemptView>(`/attempts/${attempt.id}`).then((fresh) => {
-            setAttempt(fresh)
-            onAttempt(fresh)
-          })
-        }
       })
+        .then((pulse) => {
+          setOffset(new Date(pulse.serverNow).getTime() - Date.now())
+          setAttempt((current) => ({ ...current, deadlineAt: pulse.deadlineAt, status: pulse.status }))
+          if (pulse.status !== 'in_progress') {
+            void apiRequest<AttemptView>(`/attempts/${attempt.id}`)
+              .then((fresh) => {
+                setAttempt(fresh)
+                onAttempt(fresh)
+              })
+              .catch(() => undefined)
+          }
+        })
+        .catch(() => undefined)
     }, 15000)
     return () => window.clearInterval(beat)
   }, [attempt.id, onAttempt])
@@ -173,8 +211,18 @@ function Runner({
     window.clearTimeout(timers.current[questionId])
     timers.current[questionId] = window.setTimeout(() => {
       setSaveState('saving')
-      void apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(payload) })
-        .then(() => setSaveState('saved'))
+      void apiRequest<{ questionId: string; version: number; savedAt: string }>(`/attempts/${attempt.id}/answers`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      })
+        .then((saved) => {
+          setSaveState('saved')
+          setAnswers((prev) => {
+            const cur = prev[saved.questionId]
+            if (!cur) return prev
+            return { ...prev, [saved.questionId]: { ...cur, version: saved.version, savedAt: saved.savedAt } }
+          })
+        })
         .catch((error: Error) => {
           enqueueOutbox(attempt.id, payload)
           if (error instanceof ApiError && error.status === 409) {
@@ -225,10 +273,16 @@ function Runner({
     })
   }
 
+  const [prefsError, setPrefsError] = useState('')
   const savePrefs = async (next: Preferences) => {
     setPrefs(next)
-    await apiRequest('/preferences', { method: 'PUT', body: JSON.stringify(next) })
-    await queryClient.invalidateQueries({ queryKey: ['preferences'] })
+    setPrefsError('')
+    try {
+      await apiRequest('/preferences', { method: 'PUT', body: JSON.stringify(next) })
+      await queryClient.invalidateQueries({ queryKey: ['preferences'] })
+    } catch (error) {
+      setPrefsError(error instanceof Error ? error.message : 'Could not save workspace preferences')
+    }
   }
 
   const statusLabel = useMemo(() => {
@@ -241,11 +295,32 @@ function Runner({
   }, [online, saveState])
 
   const submit = async () => {
-    const fresh = await apiRequest<AttemptView>(`/attempts/${attempt.id}/submit`, { method: 'POST' })
-    setAttempt(fresh)
-    onAttempt(fresh)
-    setConfirming(false)
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const fresh = await apiRequest<AttemptView>(`/attempts/${attempt.id}/submit`, { method: 'POST' })
+      setAttempt(fresh)
+      onAttempt(fresh)
+      setConfirming(false)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Could not submit attempt')
+    } finally {
+      setSubmitting(false)
+    }
   }
+
+  const unansweredCount = useMemo(
+    () =>
+      attempt.questions.filter((item) => {
+        const answer = answers[item.questionId]
+        return item.type === 'written' ? !answer?.text.trim() : (answer?.choiceIds.length ?? 0) === 0
+      }).length,
+    [attempt.questions, answers],
+  )
+  const flaggedCount = useMemo(
+    () => attempt.questions.filter((item) => Boolean(flags[item.questionId])).length,
+    [attempt.questions, flags],
+  )
 
   return (
     <div className="runner" data-contrast={prefs.contrast} data-font={prefs.fontScale} data-nav={prefs.navigator}>
@@ -254,7 +329,7 @@ function Runner({
           <strong>{attempt.examTitle}</strong>
           {attempt.isSandbox && <div className="meta">Sandbox mode</div>}
         </div>
-        <div>
+        <div aria-live="polite">
           <p className={urgent ? 'timer urgent meta-chip' : 'timer meta-chip'} role="timer">
             <Clock size={20} />
             {formatRemaining(remaining)}
@@ -274,14 +349,37 @@ function Runner({
           {statusLabel}
         </p>
         <div className="row">
-          <Button type="button" variant="ghost" onClick={() => setScratchOpen((open) => !open)}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setPrefsOpen(false)
+              setConfirming(false)
+              setScratchOpen((open) => !open)
+            }}
+          >
             <FileEdit size={15} /> Scratchpad
           </Button>
-          <Button type="button" variant="ghost" onClick={() => setPrefsOpen((open) => !open)}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setScratchOpen(false)
+              setConfirming(false)
+              setPrefsOpen((open) => !open)
+            }}
+          >
             <SlidersHorizontal size={15} /> View
           </Button>
           {attempt.status === 'in_progress' ? (
-            <Button type="button" onClick={() => setConfirming(true)}>
+            <Button
+              type="button"
+              onClick={() => {
+                setScratchOpen(false)
+                setPrefsOpen(false)
+                setConfirming(true)
+              }}
+            >
               <Send size={15} /> Submit
             </Button>
           ) : (
@@ -361,14 +459,20 @@ function Runner({
         <aside className="drawer">
           <h2>Scratchpad</h2>
           <p className="meta">Rough work only — not graded.</p>
+          {scratchError && <Banner tone="error">{scratchError}</Banner>}
           <textarea
             value={scratchpad}
+            disabled={attempt.status !== 'in_progress'}
             onChange={(event) => {
               const text = event.target.value
               setScratchpad(text)
+              setScratchError('')
               window.clearTimeout(timers.current.scratch)
               timers.current.scratch = window.setTimeout(() => {
                 void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }) })
+                  .catch((error: Error) => {
+                    setScratchError(error.message || 'Could not save scratchpad')
+                  })
               }, 500)
             }}
           />
@@ -377,6 +481,7 @@ function Runner({
       {prefsOpen && (
         <aside className="drawer">
           <h2>Workspace</h2>
+          {prefsError && <Banner tone="error">{prefsError}</Banner>}
           <label>
             Type size
             <Select value={prefs.fontScale} onChange={(event) => void savePrefs({ ...prefs, fontScale: event.target.value as Preferences['fontScale'] })}>
@@ -405,9 +510,15 @@ function Runner({
         <aside className="drawer">
           <h2>Submit this attempt?</h2>
           <p>You can submit once. Unanswered questions stay blank.</p>
+          <p className="meta">
+            {unansweredCount} unanswered · {flaggedCount} marked for review
+          </p>
+          {submitError && <Banner tone="error">{submitError}</Banner>}
           <div className="row">
-            <Button type="button" onClick={() => void submit()}>Submit now</Button>
-            <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>Keep working</Button>
+            <Button type="button" disabled={submitting} onClick={() => void submit()}>
+              {submitting ? 'Submitting…' : 'Submit now'}
+            </Button>
+            <Button type="button" variant="ghost" disabled={submitting} onClick={() => setConfirming(false)}>Keep working</Button>
           </div>
         </aside>
       )}

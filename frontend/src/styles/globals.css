@@ -34,7 +34,7 @@ body { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--pine); }
 :focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
-input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; border-color: var(--pine); }
 
 .shell {
   min-height: 100svh;
@@ -903,7 +903,7 @@ textarea:focus {
 
 .desk-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
   gap: 1rem;
   list-style: none;
   padding: 0;
@@ -947,7 +947,7 @@ textarea:focus {
 
 .student-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(305px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 305px), 1fr));
   gap: 1rem;
   list-style: none;
   padding: 0;
@@ -1395,9 +1395,17 @@ tbody tr:hover td {
 tbody tr:last-child td {
   border-bottom: 0;
 }
-.bars { display: grid; gap: 0.45rem; }
+.bars { display: grid; gap: 0.75rem; }
 .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; }
 .bar span { display: block; height: 100%; background: var(--pine); }
+.bar.brass span { background: var(--brass); }
+.bar.clay span { background: var(--clay); }
+.insight-card { display: grid; gap: 0.85rem; }
+.insight-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; }
+.insight-head strong { font-family: var(--serif); font-weight: 520; font-size: 1.05rem; }
+.insight-meter { display: grid; gap: 0.28rem; }
+.insight-meter-label { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; }
+.insight-miss { margin: 0; padding: 0.65rem 0.8rem; background: var(--clay-soft); border-radius: 10px; }
 
 @media (max-width: 860px) {
   .shell { flex-direction: column; }
@@ -1485,5 +1493,26 @@ tbody tr:last-child td {
   .bridge-orb { width: 50px; height: 50px; }
   .bridge-label { font-size: 0.84rem; }
   .login-panel { border-left: 0; border-top: 1px solid var(--line); }
-  .runner-bar { flex-wrap: wrap; }
+  .runner-bar { flex-wrap: wrap; gap: 0.65rem; }
+  .admin-header { flex-wrap: wrap; gap: 0.75rem; }
+  .tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; padding-bottom: 0.25rem; }
+  .tabs button { flex: 0 0 auto; white-space: nowrap; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+}
+
+@media (max-width: 600px) {
+  .main { width: calc(100% - 1rem); padding: 1rem 0 2rem; }
+  .row { flex-wrap: wrap; }
+  .drawer {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+    max-height: 75svh;
+    overflow-y: auto;
+  }
+  .runner-bar { padding: 0.75rem; }
+  .runner-body { padding: 0.75rem; }
+  .question-card { padding: 1rem; }
+  .palette { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
 }

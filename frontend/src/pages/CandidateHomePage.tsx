@@ -21,6 +21,20 @@ export function CandidateHomePage() {
   return (
     <section className="stack">
       <h1 className="page-title">Your examinations</h1>
+      {exams.isPending && <p className="meta">Loading examinations…</p>}
+      {exams.isError && (
+        <div className="stack">
+          <p className="banner error" role="alert">
+            {exams.error instanceof Error ? exams.error.message : 'Could not load examinations.'}
+          </p>
+          <div>
+            <Button type="button" variant="ghost" onClick={() => void exams.refetch()}>Retry</Button>
+          </div>
+        </div>
+      )}
+      {!exams.isPending && !exams.isError && (exams.data?.length ?? 0) === 0 && (
+        <p className="meta">No examinations assigned yet.</p>
+      )}
       {groups.map((group) => {
         const rows = exams.data?.filter((exam) => exam.access === group) ?? []
         if (rows.length === 0) return null
@@ -39,8 +53,8 @@ export function CandidateHomePage() {
                   </div>
                   <div className="row">
                     {exam.canEnter && (
-                      <Button type="button" onClick={() => start.mutate(exam.id)}>
-                        <Play size={15} /> {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
+                      <Button type="button" disabled={start.isPending} onClick={() => start.mutate(exam.id)}>
+                        <Play size={15} /> {start.isPending ? 'Starting…' : exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
                       </Button>
                     )}
                     {exam.access === 'completed' && exam.resultsReady && exam.attemptId && (
