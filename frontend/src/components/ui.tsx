@@ -48,3 +48,36 @@ export function Banner({ tone = 'info', children }: { tone?: 'info' | 'error' | 
     </p>
   )
 }
+
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  label = 'items',
+  onPageChange,
+}: {
+  page: number
+  totalPages: number
+  total: number
+  label?: string
+  onPageChange: (nextPage: number) => void
+}) {
+  if (total === 0) return null
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', marginTop: '1rem' }} aria-label="Pagination">
+      <span className="meta">
+        Page {page} of {totalPages} · {total} {label}
+      </span>
+      {totalPages > 1 && (
+        <div className="row">
+          <Button type="button" variant="ghost" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+            Previous
+          </Button>
+          <Button type="button" variant="ghost" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
