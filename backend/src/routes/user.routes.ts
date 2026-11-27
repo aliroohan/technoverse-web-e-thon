@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { asAuthed, requireRole, requireUser } from '../middleware/auth.middleware.js'
 import { importCandidates } from '../services/import.service.js'
-import { createCandidate, createUser, listUsers, updateUser } from '../services/user.service.js'
+import { createCandidate, createUser, getExaminerStudentDetail, listExaminerStudents, listUsers, updateUser } from '../services/user.service.js'
 import { roles } from '../types/domain.js'
 import { asyncHandler } from '../utils/async-handler.js'
 
@@ -32,6 +32,23 @@ const importSchema = z.object({
 
 export const candidateRouter = Router()
 candidateRouter.use(requireUser, requireRole('examiner', 'admin'))
+
+candidateRouter.get(
+  '/students',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await listExaminerStudents(asAuthed(req).user) })
+  }),
+)
+
+candidateRouter.get(
+  '/students/:candidateId',
+  asyncHandler(async (req, res) => {
+    res.json({
+      success: true,
+      data: await getExaminerStudentDetail(asAuthed(req).user, String(req.params.candidateId)),
+    })
+  }),
+)
 
 candidateRouter.post(
   '/',

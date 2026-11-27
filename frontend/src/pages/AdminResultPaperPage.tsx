@@ -137,8 +137,8 @@ export function AdminResultPaperPage() {
   return (
     <section className="stack">
       <div>
-        <Link to="/admin/logs" className="back-link">
-          <ArrowLeft size={15} /> Student log
+        <Link to="/admin/logs" className="btn-ghost btn-icon" aria-label="Back to student log" title="Back">
+          <ArrowLeft size={16} />
         </Link>
       </div>
 
