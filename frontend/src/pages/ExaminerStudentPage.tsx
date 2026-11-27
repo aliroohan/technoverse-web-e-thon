@@ -11,9 +11,8 @@ import {
   Clock,
   FileDown,
   FileText,
+  Percent,
   Send,
-  UserCheck,
-  UserX,
   XCircle,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -90,10 +89,16 @@ export function ExaminerStudentPage() {
   const { student, papers } = detail.data
   const uncheckedTotal = papers.filter((p) => p.needsChecking).length
   const checkedTotal = papers.filter((p) => p.status !== 'in_progress' && !p.needsChecking).length
+  const finalized = papers.filter((p) => p.status !== 'in_progress' && p.totalMarks > 0)
+  const averagePct = finalized.length
+    ? Math.round(
+        (finalized.reduce((sum, p) => sum + p.totalScore / p.totalMarks, 0) / finalized.length) * 100,
+      )
+    : null
 
   return (
     <section className="stack">
-      <div className="row">
+      <div className="row" style={{ gap: '0.85rem' }}>
         <Link
           to="/examiner/candidates"
           className="btn-ghost btn-icon"
@@ -102,39 +107,45 @@ export function ExaminerStudentPage() {
         >
           <ArrowLeft size={16} />
         </Link>
+        <span className="student-avatar" style={{ width: '44px', height: '44px', fontSize: '1rem' }} aria-hidden="true">
+          {initialsOf(student.name)}
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="page-title" style={{ fontSize: 'clamp(1.45rem, 2.8vw, 2rem)', margin: 0 }}>
+            {student.name}
+          </h1>
+          <div className="meta">{student.email}</div>
+        </div>
       </div>
 
-      <div className="panel">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div className="row" style={{ gap: '0.9rem' }}>
-            <span className="student-avatar" style={{ width: '46px', height: '46px', fontSize: '1.05rem' }} aria-hidden="true">
-              {initialsOf(student.name)}
-            </span>
-            <div>
-              <h1 className="page-title" style={{ fontSize: 'clamp(1.5rem, 3vw, 2.1rem)', marginBottom: '0.15rem' }}>
-                {student.name}
-              </h1>
-              <div className="meta-row">
-                <span>{student.email}</span>
-                <span className={student.active ? 'pill ok meta-chip' : 'pill danger meta-chip'} title={student.active ? 'Active' : 'Inactive'}>
-                  {student.active ? <UserCheck size={12} /> : <UserX size={12} />}
-                </span>
-              </div>
-            </div>
+      <div className="stat-strip">
+        <div className="stat-tile">
+          <div>
+            <div className="stat-value">{papers.length}</div>
+            <div className="stat-label">Papers</div>
           </div>
-          <div className="meta-row">
-            <span className="meta-chip" title="Attended papers">
-              <FileText size={14} /> {papers.length}
-            </span>
-            <span className="meta-chip" title="Checked papers">
-              <CheckCircle2 size={14} /> {checkedTotal}
-            </span>
-            {uncheckedTotal > 0 && (
-              <span className="pill warn meta-chip" title="Unchecked papers">
-                <AlertCircle size={13} /> {uncheckedTotal}
-              </span>
-            )}
+          <span className="stat-icon" aria-hidden="true"><FileText size={18} /></span>
+        </div>
+        <div className={checkedTotal > 0 ? 'stat-tile ok' : 'stat-tile'}>
+          <div>
+            <div className="stat-value">{checkedTotal}</div>
+            <div className="stat-label">Checked</div>
           </div>
+          <span className="stat-icon" aria-hidden="true"><CheckCircle2 size={18} /></span>
+        </div>
+        <div className={uncheckedTotal > 0 ? 'stat-tile warn' : 'stat-tile'}>
+          <div>
+            <div className="stat-value">{uncheckedTotal}</div>
+            <div className="stat-label">Pending</div>
+          </div>
+          <span className="stat-icon" aria-hidden="true"><AlertCircle size={18} /></span>
+        </div>
+        <div className="stat-tile">
+          <div>
+            <div className="stat-value">{averagePct !== null ? `${averagePct}%` : '—'}</div>
+            <div className="stat-label">Average</div>
+          </div>
+          <span className="stat-icon" aria-hidden="true"><Percent size={18} /></span>
         </div>
       </div>
 
@@ -146,33 +157,32 @@ export function ExaminerStudentPage() {
         <ul className="list">
           {papers.map((paper) => {
             const isOpen = expanded[paper.attemptId] ?? paper.needsChecking
+            const pct = paper.totalMarks > 0 ? Math.min(100, Math.round((paper.totalScore / paper.totalMarks) * 100)) : 0
             return (
-              <li className="card stack" key={paper.attemptId}>
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div className="row" style={{ marginBottom: '0.3rem' }}>
-                      <h2 style={{ margin: 0 }}>{paper.examTitle}</h2>
+              <li className="exam-card" key={paper.attemptId}>
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="stack" style={{ gap: '0.4rem' }}>
+                    <div className="row" style={{ gap: '0.45rem' }}>
                       {paper.needsChecking ? (
-                        <span className="pill warn meta-chip" title="Needs checking">
-                          <AlertCircle size={13} /> unchecked
+                        <span className="pill warn meta-chip">
+                          <AlertCircle size={12} /> unchecked
+                        </span>
+                      ) : paper.status === 'graded' ? (
+                        <span className="pill ok meta-chip">
+                          <CheckCircle2 size={12} /> graded
                         </span>
                       ) : (
                         <span className="pill">{paper.status.replace('_', ' ')}</span>
                       )}
                       {paper.resultsPublished && (
-                        <span className="pill ok meta-chip" title="Published">
-                          <Send size={12} />
+                        <span className="pill ok meta-chip" title="Results published">
+                          <Send size={11} /> published
                         </span>
                       )}
                     </div>
-                    <div className="meta-row">
-                      <span className="meta-chip">
-                        <Clock size={14} /> {formatWhen(paper.submittedAt ?? paper.startedAt)}
-                      </span>
-                      <span>
-                        {paper.objectiveScore} + {paper.writtenScore}
-                      </span>
-                    </div>
+                    <h2 style={{ margin: 0, fontFamily: 'var(--serif)', fontWeight: 540, fontSize: '1.3rem', lineHeight: 1.2 }}>
+                      {paper.examTitle}
+                    </h2>
                   </div>
 
                   <div className="row">
@@ -205,6 +215,28 @@ export function ExaminerStudentPage() {
                     >
                       {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </Button>
+                  </div>
+                </div>
+
+                <div className="dossier-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))' }}>
+                  <div className="dossier-stat">
+                    <span className="dossier-stat-val">{paper.objectiveScore}</span>
+                    <span className="dossier-stat-key">Objective</span>
+                  </div>
+                  <div className="dossier-stat">
+                    <span className="dossier-stat-val">{paper.writtenScore}</span>
+                    <span className="dossier-stat-key">Written</span>
+                  </div>
+                  <div className="dossier-stat">
+                    <span className="dossier-stat-val">{paper.status === 'in_progress' ? '—' : `${pct}%`}</span>
+                    <span className="dossier-stat-key">Result</span>
+                  </div>
+                  <div className="dossier-stat">
+                    <span className="dossier-stat-val" style={{ fontSize: '0.9rem', fontWeight: 520 }}>
+                      <Clock size={13} style={{ color: 'var(--ink-soft)' }} />
+                      {formatWhen(paper.submittedAt ?? paper.startedAt)}
+                    </span>
+                    <span className="dossier-stat-key">{paper.submittedAt ? 'Submitted' : 'Started'}</span>
                   </div>
                 </div>
 
@@ -251,7 +283,14 @@ function PaperCheckingSection({
   }
 
   return (
-    <div className="stack" style={{ paddingTop: '0.65rem', borderTop: '1px solid var(--line)' }}>
+    <div
+      className="stack"
+      style={{
+        paddingTop: '0.85rem',
+        borderTop: '1px solid var(--line)',
+        animation: 'panelReveal 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+      }}
+    >
       {paper.questions.map((question, idx) => {
         if (question.type === 'written') {
           const grade = paper.grades.find((g) => g.questionId === question.questionId)
@@ -275,12 +314,22 @@ function PaperCheckingSection({
           selected.size === correct.size && [...selected].every((id) => correct.has(id))
 
         return (
-          <div className="panel stack" key={question.questionId} style={{ padding: '0.8rem 0.95rem', gap: '0.45rem' }}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <strong>
+          <div
+            className="stack"
+            key={question.questionId}
+            style={{
+              background: 'var(--paper)',
+              border: '1px solid rgba(221, 212, 196, 0.85)',
+              borderRadius: '12px',
+              padding: '0.8rem 0.95rem',
+              gap: '0.5rem',
+            }}
+          >
+            <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              <strong style={{ fontSize: '0.96rem' }}>
                 {idx + 1}. {question.stem}
               </strong>
-              <span className={exact ? 'pill ok meta-chip' : 'pill danger meta-chip'}>
+              <span className={exact ? 'pill ok meta-chip' : 'pill danger meta-chip'} style={{ flexShrink: 0 }}>
                 {exact ? <Check size={13} /> : <XCircle size={13} />}
                 {question.marks}
               </span>
@@ -293,6 +342,7 @@ function PaperCheckingSection({
                   <span
                     key={choice.id}
                     className={picked ? (isRight ? 'qbank-choice correct' : 'qbank-choice wrong') : 'qbank-choice'}
+                    style={!picked ? { background: 'var(--paper-2)' } : undefined}
                   >
                     {picked ? (isRight ? <Check size={13} /> : <XCircle size={13} />) : null}
                     {choice.text}
@@ -353,17 +403,26 @@ function WrittenQuestionChecker({
   }
 
   return (
-    <form className="panel stack" onSubmit={(event) => void submit(event)} style={{ padding: '0.9rem 1rem' }}>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <strong>
+    <form
+      className="stack"
+      onSubmit={(event) => void submit(event)}
+      style={{
+        background: 'var(--paper)',
+        border: '1px solid rgba(221, 212, 196, 0.85)',
+        borderRadius: '12px',
+        padding: '0.9rem 1rem',
+      }}
+    >
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+        <strong style={{ fontSize: '0.96rem' }}>
           {index + 1}. {question.stem}
         </strong>
-        <span className={existing ? 'pill ok' : 'pill warn'}>
+        <span className={existing ? 'pill ok' : 'pill warn'} style={{ flexShrink: 0 }}>
           {existing ? `${existing.awardedMarks} / ${question.marks}` : `0–${question.marks}`}
         </span>
       </div>
 
-      <div className="response-box">
+      <div className="response-box" style={{ background: 'var(--paper-2)' }}>
         {question.answer.text.trim() ? question.answer.text : <span className="meta">—</span>}
       </div>
 
