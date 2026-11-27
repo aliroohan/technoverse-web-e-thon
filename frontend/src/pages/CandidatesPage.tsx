@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Upload, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { CandidateForm, CandidateImport, type DirectoryPerson } from '../components/CandidateTools'
 import { Banner, Button } from '../components/ui'
@@ -23,7 +24,6 @@ export function CandidatesPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Candidates</h1>
-          <p className="lede">Add people here. They join an examination only when you select them on that paper.</p>
         </div>
         <div className="row">
           <Button
@@ -34,7 +34,7 @@ export function CandidatesPage() {
               setCreating(false)
             }}
           >
-            Import
+            <Upload size={15} /> Import
           </Button>
           <Button
             type="button"
@@ -43,7 +43,7 @@ export function CandidatesPage() {
               setImporting(false)
             }}
           >
-            New candidate
+            <UserPlus size={15} /> New candidate
           </Button>
         </div>
       </div>

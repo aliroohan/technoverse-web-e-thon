@@ -412,6 +412,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.42rem;
   font-size: 0.9375rem;
   font-weight: 560;
   line-height: 1;
@@ -419,6 +420,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   justify-self: start;
   white-space: nowrap;
 }
+.btn-icon {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
+}
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+.back-link:hover { color: var(--ink); }
 .btn-ghost { background: transparent; color: var(--ink); }
 .btn-danger { background: var(--clay); border-color: var(--clay); }
 .btn-block { justify-self: stretch; width: 100%; }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Pencil, Trash2, Upload } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
 import { Banner, Button, Area } from '../components/ui'
@@ -39,7 +40,7 @@ export function QuestionBankPage() {
       setEditing(null)
     } else {
       await apiRequest('/questions', { method: 'POST', body: JSON.stringify(payload) })
-      setNotice('Question saved to the bank.')
+      setNotice('Question saved.')
     }
     await queryClient.invalidateQueries({ queryKey: ['questions'] })
   }
@@ -53,24 +54,37 @@ export function QuestionBankPage() {
     <div className="grid two">
       <section>
         <h1 className="page-title">Question bank</h1>
-        <p className="lede">Categories and difficulty feed both the paper and the fairness budget. Editing a question never rewrites an attempt that has already started.</p>
         {notice && <Banner>{notice}</Banner>}
         <ul className="list">
           {questions.data?.map((question) => (
             <li className="card" key={question.id}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
                 <strong>{question.stem}</strong>
-                <div className="row">
-                  <Button type="button" variant="ghost" onClick={() => setEditing(question)}>
-                    Edit
+                <div className="row" style={{ flexWrap: 'nowrap' }}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="btn-icon"
+                    aria-label={`Edit ${question.stem}`}
+                    title="Edit"
+                    onClick={() => setEditing(question)}
+                  >
+                    <Pencil size={15} />
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => remove.mutate(question.id)}>
-                    Delete
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="btn-icon"
+                    aria-label={`Delete ${question.stem}`}
+                    title="Delete"
+                    onClick={() => remove.mutate(question.id)}
+                  >
+                    <Trash2 size={15} />
                   </Button>
                 </div>
               </div>
               <p className="meta">
-                {question.type} · {question.category} · {question.difficulty} · {question.marks} marks
+                {question.type} · {question.category} · {question.difficulty} · {question.marks} pts
               </p>
             </li>
           ))}
@@ -89,10 +103,10 @@ export function QuestionBankPage() {
         </div>
         <form className="panel stack" onSubmit={importSubmit}>
           <h2>Import CSV</h2>
-          <p className="meta">Headers: stem, type, category, difficulty, marks, choices, correct. Separate choices with |. Correct letters look like A|C. Valid rows save; bad rows are reported.</p>
+          <p className="meta">Columns: stem, type, category, difficulty, marks, choices (|), correct (A|C)</p>
           <Area value={importText} onChange={(event) => setImportText(event.target.value)} />
           <Button type="submit" variant="ghost">
-            Import questions
+            <Upload size={15} /> Import
           </Button>
         </form>
       </div>

@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { LogIn, ShieldCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Banner, Button, Field, TextInput } from '../components/ui'
 import { ApiError, apiRequest } from '../lib/api-client'
@@ -31,9 +32,9 @@ export function LoginPage() {
   return (
     <div className="login">
       <section className="login-hero">
-        <p className="meta">Secure examination desk</p>
+        <p className="meta-chip meta"><ShieldCheck size={15} /> Secure examination desk</p>
         <h1>Holdfast</h1>
-        <p className="lede">The clock belongs to the server. A dropped connection does not buy time, and it does not lose the last accepted answer.</p>
+        <p className="lede">Server-owned clock. Failure-resilient sitting.</p>
       </section>
       <section className="login-panel">
         <form className="stack" onSubmit={(event) => void submit(event)}>
@@ -45,8 +46,9 @@ export function LoginPage() {
           <Field label="Password">
             <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </Field>
-          <Button type="submit">Enter</Button>
-          <p className="meta">Demo accounts are listed in the project README. There is no public registration.</p>
+          <Button type="submit">
+            <LogIn size={16} /> Enter
+          </Button>
         </form>
       </section>
     </div>

@@ -1,7 +1,21 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useParams } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileEdit,
+  Flag,
+  LogOut,
+  Send,
+  SlidersHorizontal,
+  Wifi,
+  WifiOff,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { Banner, Button, Select } from '../components/ui'
 import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
@@ -54,7 +68,7 @@ function Runner({
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [online, setOnline] = useState(navigator.onLine)
   const [offset, setOffset] = useState(() => new Date(initial.serverNow).getTime() - Date.now())
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [scratchpad, setScratchpad] = useState(initial.scratchpad)
   const [scratchOpen, setScratchOpen] = useState(false)
   const [prefsOpen, setPrefsOpen] = useState(false)
@@ -66,6 +80,24 @@ function Runner({
   const question = attempt.questions[index]
   const remaining = new Date(attempt.deadlineAt).getTime() - (now + offset)
   const urgent = remaining < 5 * 60 * 1000 && attempt.status === 'in_progress'
+
+  const flush = useCallback(async () => {
+    const queued = readOutbox(attempt.id)
+    const kept: OutboxItem[] = []
+    for (const item of queued) {
+      try {
+        await apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(item) })
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          setLateNote(error.message)
+        } else {
+          kept.push(item)
+        }
+      }
+    }
+    writeOutbox(attempt.id, kept)
+    if (kept.length === 0) setSaveState('saved')
+  }, [attempt.id])
 
   useEffect(() => {
     const clock = window.setInterval(() => setNow(Date.now()), 1000)
@@ -81,7 +113,7 @@ function Runner({
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
     }
-  }, [attempt.id])
+  }, [attempt.id, flush])
 
   useEffect(() => {
     const beat = window.setInterval(() => {
@@ -136,24 +168,6 @@ function Runner({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [attempt.questions.length])
-
-  const flush = async () => {
-    const queued = readOutbox(attempt.id)
-    const kept: OutboxItem[] = []
-    for (const item of queued) {
-      try {
-        await apiRequest(`/attempts/${attempt.id}/answers`, { method: 'PUT', body: JSON.stringify(item) })
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 409) {
-          setLateNote(error.message)
-        } else {
-          kept.push(item)
-        }
-      }
-    }
-    writeOutbox(attempt.id, kept)
-    if (kept.length === 0) setSaveState('saved')
-  }
 
   const queueSave = (questionId: string, payload: OutboxItem) => {
     window.clearTimeout(timers.current[questionId])
@@ -218,12 +232,12 @@ function Runner({
   }
 
   const statusLabel = useMemo(() => {
-    if (!online) return 'Offline. Answers stay on this device until the connection returns. The deadline will not move.'
+    if (!online) return 'Offline · queued'
     if (saveState === 'saving') return 'Saving…'
     if (saveState === 'saved') return 'Saved'
-    if (saveState === 'failed') return 'Not saved yet. We will retry.'
-    if (saveState === 'rejected') return 'Rejected. The deadline has passed.'
-    return 'Waiting for an answer'
+    if (saveState === 'failed') return 'Retry pending'
+    if (saveState === 'rejected') return 'Deadline passed'
+    return 'Ready'
   }, [online, saveState])
 
   const submit = async () => {
@@ -238,39 +252,59 @@ function Runner({
       <header className="runner-bar">
         <div>
           <strong>{attempt.examTitle}</strong>
-          {attempt.isSandbox && <div className="meta">Sandbox. This attempt is excluded from results and statistics.</div>}
+          {attempt.isSandbox && <div className="meta">Sandbox mode</div>}
         </div>
         <div>
-          <p className={urgent ? 'timer urgent' : 'timer'} role="timer">
+          <p className={urgent ? 'timer urgent meta-chip' : 'timer meta-chip'} role="timer">
+            <Clock size={20} />
             {formatRemaining(remaining)}
           </p>
-          {urgent && attempt.status === 'in_progress' && <p className="meta">Ending soon</p>}
+          {urgent && attempt.status === 'in_progress' && <p className="meta" style={{ margin: 0 }}>Ending soon</p>}
         </div>
-        <p className="meta" role="status">{statusLabel}</p>
-        <div className="row">
-          <Button type="button" variant="ghost" onClick={() => setScratchOpen((open) => !open)}>Scratchpad</Button>
-          <Button type="button" variant="ghost" onClick={() => setPrefsOpen((open) => !open)}>View</Button>
-          {attempt.status === 'in_progress' ? (
-            <Button type="button" onClick={() => setConfirming(true)}>Submit</Button>
+        <p className="meta meta-chip" role="status" style={{ margin: 0 }}>
+          {!online ? (
+            <WifiOff size={15} />
+          ) : saveState === 'rejected' || saveState === 'failed' ? (
+            <AlertTriangle size={15} />
+          ) : saveState === 'saved' ? (
+            <Check size={15} />
           ) : (
-            <Link className="btn-ghost" to={attempt.isSandbox ? '/examiner/exams' : '/candidate'}>Leave</Link>
+            <Wifi size={15} />
+          )}
+          {statusLabel}
+        </p>
+        <div className="row">
+          <Button type="button" variant="ghost" onClick={() => setScratchOpen((open) => !open)}>
+            <FileEdit size={15} /> Scratchpad
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setPrefsOpen((open) => !open)}>
+            <SlidersHorizontal size={15} /> View
+          </Button>
+          {attempt.status === 'in_progress' ? (
+            <Button type="button" onClick={() => setConfirming(true)}>
+              <Send size={15} /> Submit
+            </Button>
+          ) : (
+            <Link className="btn-ghost" to={attempt.isSandbox ? '/examiner/exams' : '/candidate'}>
+              <LogOut size={15} /> Leave
+            </Link>
           )}
         </div>
       </header>
       {!online && (
-        <Banner>You are offline. New answers are queued on this device. Reconnecting will not extend the deadline.</Banner>
+        <Banner>Offline — new answers stay queued locally; deadline does not pause.</Banner>
       )}
       {lateNote && <Banner tone="error">{lateNote}</Banner>}
       {attempt.announcements.map((announcement) => (
-        <Banner key={announcement.id}>Announcement: {announcement.body}</Banner>
+        <Banner key={announcement.id}>{announcement.body}</Banner>
       ))}
       {attempt.status !== 'in_progress' && (
-        <Banner tone="ok">This attempt is {attempt.status}. Further answers are not accepted.</Banner>
+        <Banner tone="ok">Attempt {attempt.status}.</Banner>
       )}
       <div className="runner-body">
         {question && (
           <article className="question-card">
-            <p className="meta">Question {index + 1} of {attempt.questions.length} · {question.marks} marks · {question.type}</p>
+            <p className="meta">Question {index + 1} / {attempt.questions.length} · {question.marks} pts · {question.type}</p>
             <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 520, fontSize: '1.8rem' }}>{question.stem}</h1>
             {question.type === 'written' ? (
               <label>
@@ -293,13 +327,13 @@ function Runner({
             )}
             <div className="row" style={{ marginTop: '1rem' }}>
               <Button type="button" variant="ghost" onClick={() => setIndex((value) => Math.max(0, value - 1))} disabled={index === 0}>
-                Previous
+                <ChevronLeft size={15} /> Previous
               </Button>
               <Button type="button" variant="ghost" onClick={toggleFlag}>
-                {flags[question.questionId] ? 'Clear review mark' : 'Mark for review'}
+                <Flag size={15} /> {flags[question.questionId] ? 'Unmark' : 'Review'}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setIndex((value) => Math.min(attempt.questions.length - 1, value + 1))} disabled={index === attempt.questions.length - 1}>
-                Next
+                Next <ChevronRight size={15} />
               </Button>
             </div>
           </article>
@@ -326,7 +360,7 @@ function Runner({
       {scratchOpen && (
         <aside className="drawer">
           <h2>Scratchpad</h2>
-          <p className="meta">Rough work. It is saved with the attempt and is not part of the graded response.</p>
+          <p className="meta">Rough work only — not graded.</p>
           <textarea
             value={scratchpad}
             onChange={(event) => {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
+import { ArrowRight, Award, Clock, Plus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Button, Dialog, Field, TextInput, Area } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
@@ -55,10 +56,9 @@ export function ExamListPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Examinations</h1>
-          <p className="lede">Draft, publish, sit, mark, and release. The lifecycle follows the server clock.</p>
         </div>
         <Button type="button" onClick={() => setOpen(true)}>
-          New exam
+          <Plus size={16} /> New exam
         </Button>
       </div>
       <ul className="list">
@@ -68,9 +68,12 @@ export function ExamListPage() {
               <h2>{exam.title}</h2>
               <span className="pill">{exam.lifecycle}</span>
             </div>
-            <p className="meta">{exam.durationMinutes} minutes · {exam.totalMarks} marks</p>
+            <div className="meta-row" style={{ marginBottom: '0.75rem' }}>
+              <span className="meta-chip"><Clock size={14} /> {exam.durationMinutes}m</span>
+              <span className="meta-chip"><Award size={14} /> {exam.totalMarks} pts</span>
+            </div>
             <Link className="btn" to="/examiner/exams/$examId" params={{ examId: exam.id }}>
-              Open desk
+              Open desk <ArrowRight size={15} />
             </Link>
           </li>
         ))}
@@ -91,14 +94,14 @@ export function ExamListPage() {
             <Field label="Closes">
               <TextInput type="datetime-local" value={form.windowEnd} onChange={(event) => setForm({ ...form, windowEnd: event.target.value })} required />
             </Field>
-            <Field label="Duration in minutes">
+            <Field label="Duration (min)">
               <TextInput type="number" min={1} value={form.durationMinutes} onChange={(event) => setForm({ ...form, durationMinutes: Number(event.target.value) })} />
             </Field>
             <Field label="Total marks">
               <TextInput type="number" min={1} value={form.totalMarks} onChange={(event) => setForm({ ...form, totalMarks: Number(event.target.value) })} />
             </Field>
             <Button type="submit" block disabled={create.isPending}>
-              Create draft
+              <Plus size={15} /> Create draft
             </Button>
             {create.error && <p className="banner error">{create.error.message}</p>}
           </form>

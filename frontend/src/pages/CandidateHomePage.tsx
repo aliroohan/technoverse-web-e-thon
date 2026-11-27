@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { Calendar, Clock, Eye, Play } from 'lucide-react'
 import { Button } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
@@ -19,32 +19,33 @@ export function CandidateHomePage() {
   })
 
   return (
-    <section>
+    <section className="stack">
       <h1 className="page-title">Your examinations</h1>
-      <p className="lede">Available means the window is open. Upcoming means the server clock has not reached the start. A closed window cannot be entered.</p>
       {groups.map((group) => {
         const rows = exams.data?.filter((exam) => exam.access === group) ?? []
         if (rows.length === 0) return null
         return (
-          <section key={group}>
-            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 520 }}>{group}</h2>
+          <section key={group} className="stack">
+            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 520, textTransform: 'capitalize', margin: 0 }}>{group}</h2>
             <ul className="list">
               {rows.map((exam) => (
                 <li className="card" key={exam.id}>
                   <h3 style={{ margin: '0 0 0.3rem' }}>{exam.title}</h3>
-                  <p>{exam.instructions}</p>
-                  <p className="meta">
-                    {formatWhen(exam.windowStart)} – {formatWhen(exam.windowEnd)} · {exam.durationMinutes} min · {exam.reason}
-                  </p>
+                  <p style={{ margin: '0 0 0.5rem' }}>{exam.instructions}</p>
+                  <div className="meta-row" style={{ marginBottom: '0.75rem' }}>
+                    <span className="meta-chip"><Calendar size={14} /> {formatWhen(exam.windowStart)} – {formatWhen(exam.windowEnd)}</span>
+                    <span className="meta-chip"><Clock size={14} /> {exam.durationMinutes}m</span>
+                    <span>{exam.reason}</span>
+                  </div>
                   <div className="row">
                     {exam.canEnter && (
                       <Button type="button" onClick={() => start.mutate(exam.id)}>
-                        {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
+                        <Play size={15} /> {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
                       </Button>
                     )}
                     {exam.access === 'completed' && exam.resultsPublished && exam.attemptId && (
                       <Link className="btn-ghost" to="/candidate/results/$attemptId" params={{ attemptId: exam.attemptId }}>
-                        View result
+                        <Eye size={15} /> View result
                       </Link>
                     )}
                   </div>

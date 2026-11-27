@@ -1,5 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
+import {
+  ArrowLeft,
+  Award,
+  Calendar,
+  Check,
+  Clock,
+  EyeOff,
+  FileDown,
+  MessageSquare,
+  Search,
+  Send,
+  ShieldCheck,
+  ShieldOff,
+  SlidersHorizontal,
+  User,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Area, Banner, Button, Field, Pagination, TextInput } from '../components/ui'
 import { apiRequest, downloadPdf } from '../lib/api-client'
@@ -102,14 +119,14 @@ export function AdminResultPaperPage() {
     onSuccess: async (_data, published) => {
       setNotice({
         tone: 'ok',
-        text: published ? 'Results published for all graded candidates.' : 'Results unpublished.',
+        text: published ? 'Results published.' : 'Results unpublished.',
       })
       await refresh()
     },
     onError: (error: Error) => setNotice({ tone: 'error', text: error.message }),
   })
 
-  if (detail.isPending) return <p className="meta">Loading question paper…</p>
+  if (detail.isPending) return <p className="meta">Loading…</p>
   if (detail.error || !detail.data) {
     return <Banner tone="error">{detail.error?.message ?? 'Could not load question paper.'}</Banner>
   }
@@ -119,21 +136,29 @@ export function AdminResultPaperPage() {
   return (
     <section className="stack">
       <div>
-        <Link to="/admin/logs" className="meta">
-          ← Back to student log
+        <Link to="/admin/logs" className="back-link">
+          <ArrowLeft size={15} /> Student log
         </Link>
       </div>
 
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p className="meta">
-            {exam.lifecycle} · {exam.resultsPublished ? 'results published' : 'results unpublished'}
-          </p>
           <h1 className="page-title">{exam.title}</h1>
-          <p className="meta">
-            Window {formatWhen(exam.windowStart)} – {formatWhen(exam.windowEnd)} · {exam.durationMinutes} min ·{' '}
-            {exam.totalMarks} total marks
-          </p>
+          <div className="meta-row">
+            <span className="pill">{exam.lifecycle}</span>
+            <span className={exam.resultsPublished ? 'pill ok' : 'pill'}>
+              {exam.resultsPublished ? 'published' : 'unpublished'}
+            </span>
+            <span className="meta-chip">
+              <Calendar size={14} /> {formatWhen(exam.windowStart)} – {formatWhen(exam.windowEnd)}
+            </span>
+            <span className="meta-chip">
+              <Clock size={14} /> {exam.durationMinutes}m
+            </span>
+            <span className="meta-chip">
+              <Award size={14} /> {exam.totalMarks} pts
+            </span>
+          </div>
         </div>
         <Button
           type="button"
@@ -141,7 +166,8 @@ export function AdminResultPaperPage() {
           disabled={togglePublication.isPending}
           onClick={() => togglePublication.mutate(!exam.resultsPublished)}
         >
-          {exam.resultsPublished ? 'Unpublish results' : 'Publish results'}
+          {exam.resultsPublished ? <EyeOff size={15} /> : <Send size={15} />}
+          {exam.resultsPublished ? 'Unpublish' : 'Publish results'}
         </Button>
       </div>
 
@@ -149,9 +175,9 @@ export function AdminResultPaperPage() {
 
       {/* 1. Questions in paper */}
       <section className="stack">
-        <h2>Questions in paper ({questions.length})</h2>
+        <h2>Questions ({questions.length})</h2>
         {questions.length === 0 ? (
-          <Banner>No questions assigned to this paper yet.</Banner>
+          <Banner>No questions assigned.</Banner>
         ) : (
           <ol className="list">
             {questions.map((question, index) => (
@@ -160,7 +186,7 @@ export function AdminResultPaperPage() {
                   <strong>
                     {index + 1}. {question.stem}
                   </strong>
-                  <span className="pill">{question.marks} marks</span>
+                  <span className="pill">{question.marks} pts</span>
                 </div>
                 <p className="meta" style={{ margin: '0.35rem 0 0' }}>
                   {question.type} · {question.category} · {question.difficulty}
@@ -172,7 +198,10 @@ export function AdminResultPaperPage() {
                       const isCorrect = question.correctChoiceIds.includes(choice.id)
                       return (
                         <li key={choice.id} className={isCorrect ? '' : 'meta'}>
-                          {choice.text} {isCorrect ? <strong>(correct)</strong> : null}
+                          {choice.text}{' '}
+                          {isCorrect && (
+                            <Check size={14} style={{ display: 'inline', verticalAlign: '-2px', color: 'var(--pine)' }} />
+                          )}
                         </li>
                       )
                     })}
@@ -186,19 +215,17 @@ export function AdminResultPaperPage() {
 
       {/* 2. Examiner name */}
       <section className="panel">
-        <p className="meta" style={{ margin: 0 }}>
-          Examiner
-        </p>
-        <h2 style={{ margin: '0.15rem 0 0' }}>
-          {exam.examinerName}
-          {exam.examinerEmail ? <span className="meta" style={{ fontSize: '0.95rem', fontWeight: 400 }}> · {exam.examinerEmail}</span> : null}
-        </h2>
+        <div className="meta-row">
+          <User size={16} />
+          <strong style={{ color: 'var(--ink)', fontSize: '1.05rem' }}>{exam.examinerName}</strong>
+          {exam.examinerEmail && <span className="meta">{exam.examinerEmail}</span>}
+        </div>
       </section>
 
-      {/* 3. Students who attempted this paper, their marks, and teacher comments */}
+      {/* 3. Students who attempted this paper */}
       <section className="stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h2>Students who attempted this paper ({students.total})</h2>
+          <h2>Attempts ({students.total})</h2>
           <form
             className="row"
             onSubmit={(event) => {
@@ -207,21 +234,30 @@ export function AdminResultPaperPage() {
               setSearch(searchInput)
             }}
           >
-            <TextInput
-              aria-label="Filter students"
-              placeholder="Search student name or email…"
-              value={searchInput}
-              onChange={(event) => {
-                const value = event.target.value
-                setSearchInput(value)
-                if (value === '') {
-                  setPage(1)
-                  setSearch('')
-                }
-              }}
-            />
-            <Button type="submit" variant="ghost">
-              Filter
+            <div style={{ position: 'relative' }}>
+              <Search
+                size={14}
+                aria-hidden="true"
+                style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-soft)', pointerEvents: 'none' }}
+              />
+              <TextInput
+                className="compact-input"
+                style={{ paddingLeft: '2rem', minWidth: '210px' }}
+                aria-label="Filter students"
+                placeholder="Search student…"
+                value={searchInput}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setSearchInput(value)
+                  if (value === '') {
+                    setPage(1)
+                    setSearch('')
+                  }
+                }}
+              />
+            </div>
+            <Button type="submit" variant="ghost" className="btn-icon" aria-label="Search students" title="Search">
+              <Search size={15} />
             </Button>
           </form>
         </div>
@@ -241,7 +277,7 @@ export function AdminResultPaperPage() {
         )}
 
         {students.items.length === 0 ? (
-          <Banner>No students have attempted this question paper yet.</Banner>
+          <Banner>No attempts yet.</Banner>
         ) : (
           <div className="panel" style={{ overflowX: 'auto' }}>
             <table>
@@ -250,8 +286,8 @@ export function AdminResultPaperPage() {
                   <th>Student</th>
                   <th>Status</th>
                   <th>Marks</th>
-                  <th>Teacher comments</th>
-                  <th>Actions</th>
+                  <th>Comments</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,9 +301,7 @@ export function AdminResultPaperPage() {
                       </td>
                       <td>
                         <span className="pill">{student.status.replace('_', ' ')}</span>
-                        {student.gradingStatus === 'pending_subjective' && (
-                          <div className="meta">pending written grade</div>
-                        )}
+                        {student.gradingStatus === 'pending_subjective' && <div className="meta">needs grading</div>}
                       </td>
                       <td>
                         <strong>
@@ -283,30 +317,43 @@ export function AdminResultPaperPage() {
                         ) : (
                           <div className="stack" style={{ gap: '0.25rem' }}>
                             {student.questionComments.map((item) => (
-                              <div key={item.questionId}>
-                                <span className="meta">Q{item.order + 1} ({item.graderName}):</span>{' '}
-                                {item.comment}
+                              <div key={item.questionId} className="meta-chip" style={{ alignItems: 'flex-start' }}>
+                                <MessageSquare size={13} style={{ marginTop: '3px', flexShrink: 0 }} />
+                                <span>
+                                  <span className="meta">Q{item.order + 1}:</span> {item.comment}
+                                </span>
                               </div>
                             ))}
                             {student.teacherComment && (
-                              <div>
-                                <span className="meta">Overall:</span> {student.teacherComment}
+                              <div className="meta-chip" style={{ alignItems: 'flex-start' }}>
+                                <MessageSquare size={13} style={{ marginTop: '3px', flexShrink: 0 }} />
+                                <span>{student.teacherComment}</span>
                               </div>
                             )}
                           </div>
                         )}
                       </td>
-                      <td>
-                        <div className="row">
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="row" style={{ justifyContent: 'flex-end' }}>
                           {canManage && (
-                            <Button type="button" variant="ghost" onClick={() => setEditing(student)}>
-                              Manage result
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="btn-icon"
+                              aria-label={`Manage result for ${student.candidateName}`}
+                              title="Manage result"
+                              onClick={() => setEditing(student)}
+                            >
+                              <SlidersHorizontal size={15} />
                             </Button>
                           )}
                           {canManage && student.attemptId && (
                             <Button
                               type="button"
                               variant="ghost"
+                              className="btn-icon"
+                              aria-label={`Download PDF for ${student.candidateName}`}
+                              title="Download PDF"
                               onClick={() =>
                                 void downloadPdf(
                                   `/reports/${student.attemptId}/pdf`,
@@ -314,7 +361,7 @@ export function AdminResultPaperPage() {
                                 )
                               }
                             >
-                              PDF
+                              <FileDown size={15} />
                             </Button>
                           )}
                         </div>
@@ -403,11 +450,11 @@ function ManageStudentResultPanel({
       })
       await onSaved(
         nextRevoked
-          ? `Revoked verification code ${student.verification.code}.`
-          : `Restored verification code ${student.verification.code}.`,
+          ? `Revoked code ${student.verification.code}.`
+          : `Restored code ${student.verification.code}.`,
       )
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Could not update verification status')
+      onError(error instanceof Error ? error.message : 'Could not update verification')
     } finally {
       setSaving(false)
     }
@@ -420,13 +467,13 @@ function ManageStudentResultPanel({
     <form className="panel stack" onSubmit={(event) => void save(event)}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div>
-          <h2>Manage result: {student.candidateName}</h2>
+          <h2>{student.candidateName}</h2>
           <p className="meta">
-            {student.candidateEmail} · Submitted {formatWhen(student.submittedAt)}
+            {student.candidateEmail} · {formatWhen(student.submittedAt)}
           </p>
         </div>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Close
+        <Button type="button" variant="ghost" className="btn-icon" aria-label="Close" onClick={onClose}>
+          <X size={16} />
         </Button>
       </div>
 
@@ -448,8 +495,8 @@ function ManageStudentResultPanel({
           <strong>
             Q{item.order + 1}. {item.stem}
           </strong>
-          <div className="grid two">
-            <Field label={`Awarded marks (0–${item.marks})`}>
+          <div className="compact-grid">
+            <Field label={`Marks (0–${item.marks})`}>
               <TextInput
                 type="number"
                 min={0}
@@ -462,7 +509,7 @@ function ManageStudentResultPanel({
                 }}
               />
             </Field>
-            <Field label="Teacher question comment">
+            <Field label="Teacher comment">
               <TextInput
                 value={item.comment}
                 onChange={(event) => {
@@ -475,18 +522,19 @@ function ManageStudentResultPanel({
         </div>
       ))}
 
-      <Field label="Overall teacher / admin comment">
+      <Field label="Overall comment">
         <Area
           value={teacherComment}
           onChange={(event) => setTeacherComment(event.target.value)}
-          placeholder="Optional overall feedback shown on the student's result"
+          placeholder="Optional overall feedback"
         />
       </Field>
 
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div className="row">
           <Button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save result changes'}
+            <Check size={15} />
+            {saving ? 'Saving…' : 'Save'}
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
@@ -494,9 +542,10 @@ function ManageStudentResultPanel({
         </div>
         {student.verification && (
           <Button type="button" variant="ghost" disabled={saving} onClick={() => void toggleVerification()}>
+            {student.verification.revoked ? <ShieldCheck size={15} /> : <ShieldOff size={15} />}
             {student.verification.revoked
-              ? `Restore report (${student.verification.code})`
-              : `Revoke report (${student.verification.code})`}
+              ? `Restore (${student.verification.code})`
+              : `Revoke (${student.verification.code})`}
           </Button>
         )}
       </div>

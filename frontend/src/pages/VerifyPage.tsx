@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
-import { apiRequest } from '../lib/api-client'
+import { Award, Clock, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { formatWhen } from '../lib/format'
+import { apiRequest } from '../lib/api-client'
 
 type Verification = {
   examTitle: string
@@ -19,17 +20,27 @@ export function VerifyPage() {
   })
 
   return (
-    <main className="main">
-      <p className="meta">Public verification</p>
-      <h1 className="page-title">Holdfast</h1>
-      {result.isPending && <p>Checking the code…</p>}
+    <main className="main stack">
+      <div>
+        <p className="meta" style={{ margin: 0 }}>Public verification</p>
+        <h1 className="page-title">Holdfast</h1>
+      </div>
+      {result.isPending && <p className="meta">Checking…</p>}
       {result.error && <p className="banner error">No issued report matches that code.</p>}
       {result.data && (
-        <article className="card">
-          <h2>{result.data.examTitle}</h2>
-          <p>Score {result.data.totalScore} / {result.data.totalMarks}</p>
-          <p className="meta">Issued {formatWhen(result.data.issuedAt)} · {result.data.status}</p>
-          <p className="meta">This page does not show a name, an email, a script, or anyone else’s result.</p>
+        <article className="card stack">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0 }}>{result.data.examTitle}</h2>
+            <span className={result.data.status === 'valid' ? 'pill ok meta-chip' : 'pill danger meta-chip'}>
+              {result.data.status === 'valid' ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+              {result.data.status}
+            </span>
+          </div>
+          <div className="meta-row">
+            <span className="meta-chip"><Award size={14} /> {result.data.totalScore} / {result.data.totalMarks}</span>
+            <span className="meta-chip"><Clock size={14} /> {formatWhen(result.data.issuedAt)}</span>
+          </div>
+          <p className="meta" style={{ margin: 0 }}>Verified summary only — no personal data exposed.</p>
         </article>
       )}
     </main>
