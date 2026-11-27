@@ -26,6 +26,7 @@ import { Banner, Button, Dialog, Loader, Select, Spinner } from '../components/u
 import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
 import { formatRemaining } from '../lib/format'
 import { enqueueOutbox, readOutbox, writeOutbox, type OutboxItem } from '../lib/outbox'
+import { getTabSessionId } from '../lib/session'
 import type { AttemptView, Preferences } from '../types/domain'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed' | 'rejected'
@@ -44,7 +45,21 @@ export function ExamRunnerPage() {
 
   if (attempt.isPending || preferences.isPending) return <Loader full label="Opening paper" />
   if (attempt.error || !attempt.data || !preferences.data) {
-    return <p className="banner error main">{attempt.error?.message ?? 'Could not open this attempt'}</p>
+    return (
+      <main className="main stack">
+        <p className="banner error" role="alert">
+          {attempt.error?.message ?? 'Could not open this attempt'}
+        </p>
+        <div className="row">
+          <Button type="button" onClick={() => void attempt.refetch()}>
+            Retry
+          </Button>
+          <Link className="btn-ghost" to="/candidate">
+            Back to examinations
+          </Link>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -177,20 +192,39 @@ function Runner({
               .catch(() => undefined)
           }
         })
-        .catch(() => undefined)
+        .catch((error: Error) => {
+          if (error instanceof ApiError && error.status === 409) {
+            setLateNote(error.message)
+          }
+        })
     }, 15000)
     return () => window.clearInterval(beat)
   }, [attempt.id, onAttempt])
 
   useEffect(() => {
-    const socket = io(socketOrigin, { path: '/socket.io', withCredentials: true })
+    const sessionToken = getTabSessionId()
+    const socket = io(socketOrigin, {
+      path: '/socket.io',
+      withCredentials: true,
+      auth: { sessionToken },
+    })
     socket.emit('exam:join', attempt.examId)
     socket.emit('attempt:join', attempt.id)
     socket.on('announcement', (announcement: AttemptView['announcements'][number]) => {
       setAttempt((current) => ({ ...current, announcements: [...current.announcements, announcement] }))
     })
+    const release = () => {
+      const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
+      const url = `${apiBase}/attempts/${attempt.id}/release`
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([JSON.stringify({ sessionToken })], { type: 'application/json' }))
+      }
+    }
+    window.addEventListener('pagehide', release)
     return () => {
+      window.removeEventListener('pagehide', release)
       socket.disconnect()
+      release()
     }
   }, [attempt.examId, attempt.id])
 

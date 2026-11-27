@@ -16,7 +16,7 @@ import {
 import { useMemo, useState } from 'react'
 import { CandidateForm, CandidateImport, type CandidateImportResult } from '../components/CandidateTools'
 import { Banner, Button, Loader, Select, TextInput } from '../components/ui'
-import { apiRequest } from '../lib/api-client'
+import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
 type ExaminerStudentRow = {
@@ -142,7 +142,7 @@ export function CandidatesPage() {
           </div>
           <CandidateForm
             onCreated={async (person) => {
-              setNotice(`${person.name} added. ${person.passwordNote}`)
+              notifySuccess(`${person.name} added. ${person.passwordNote}`)
               setPanel('closed')
               await refresh()
             }}
@@ -162,7 +162,11 @@ export function CandidatesPage() {
             onCancel={() => setPanel('closed')}
             onAdded={async (result: CandidateImportResult) => {
               const problems = result.errors.map((error) => `Row ${error.row}: ${error.message}`).join(' ')
-              setNotice(`${result.passwordNote} Added ${result.created}. ${problems}`.trim())
+              if (result.created > 0) {
+                notifySuccess(`${result.passwordNote} Added ${result.created}. ${problems}`.trim())
+              } else if (problems) {
+                notifyError(problems)
+              }
               setPanel('closed')
               await refresh()
             }}

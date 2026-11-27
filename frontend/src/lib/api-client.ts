@@ -1,5 +1,6 @@
 import { toast } from 'react-toastify'
 import type { ApiErrorResponse, ApiResponse } from '../types/api'
+import { getTabSessionId } from './session'
 
 const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 
@@ -55,6 +56,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       credentials: 'include',
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(path.startsWith('/attempts') ? { 'x-attempt-session': getTabSessionId() } : {}),
         ...headers,
       },
     })

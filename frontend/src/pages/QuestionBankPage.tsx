@@ -166,17 +166,18 @@ export function QuestionBankPage() {
                     body: JSON.stringify({ format: importFormat, content: importContent }),
                   })
                   setImportErrors(res.errors)
-                  setNotice({
-                    tone: res.created > 0 ? 'ok' : 'error',
-                    text: `Imported ${res.created} question(s)${res.errors.length ? `, ${res.errors.length} row(s) had errors` : '.'}`,
-                  })
+                  if (res.created > 0) {
+                    notifySuccess(`Imported ${res.created} question(s)${res.errors.length ? `, ${res.errors.length} row(s) had errors` : '.'}`)
+                  } else {
+                    notifyError(res.errors.length ? `No questions imported (${res.errors.length} row error(s)).` : 'No questions imported.')
+                  }
                   await queryClient.invalidateQueries({ queryKey: ['questions'] })
                   if (res.errors.length === 0) {
                     setImportContent('')
                     setFormMode('closed')
                   }
                 } catch (err) {
-                  setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Import failed' })
+                  notifyError(err instanceof Error ? err.message : 'Import failed')
                 } finally {
                   setImporting(false)
                 }

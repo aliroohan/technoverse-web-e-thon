@@ -25,7 +25,7 @@ import { CandidateForm, CandidateImport, type DirectoryPerson } from '../compone
 import { VerifyShare } from '../components/VerifyShare'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
 import { Banner, Button, Dialog, Drawer, Field, Loader, TextInput, Area } from '../components/ui'
-import { apiRequest } from '../lib/api-client'
+import { apiRequest, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen, toDateTimeLocal } from '../lib/format'
 import type { ExamSummary, Question } from '../types/domain'
 
@@ -120,7 +120,6 @@ export function ExamDeskPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('setup')
-  const [notice, setNotice] = useState('')
   const desk = useQuery({
     queryKey: ['exam', examId],
     queryFn: () => apiRequest<Desk>(`/exams/${examId}`),
@@ -170,7 +169,6 @@ export function ExamDeskPage() {
         <p className="meta" style={{ margin: 0 }}>{exam.lifecycle}{exam.resultsPublished ? ' · published' : ''}</p>
       </div>
       <h1 className="page-title">{exam.title}</h1>
-      {notice && <Banner>{notice}</Banner>}
       <div className="tabs" role="tablist" aria-label="Examination sections">
         {tabs.map((item, idx) => (
           <button
@@ -190,11 +188,11 @@ export function ExamDeskPage() {
         ))}
       </div>
       <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {tab === 'setup' && <Setup exam={exam} onSaved={refresh} onNotice={setNotice} />}
-        {tab === 'questions' && <Questions exam={exam} onSaved={refresh} onNotice={setNotice} />}
-        {tab === 'people' && <People exam={exam} onSaved={refresh} onNotice={setNotice} />}
+        {tab === 'setup' && <Setup exam={exam} onSaved={refresh} />}
+        {tab === 'questions' && <Questions exam={exam} onSaved={refresh} />}
+        {tab === 'people' && <People exam={exam} onSaved={refresh} />}
         {tab === 'monitor' && <Monitor examId={exam.id} />}
-        {tab === 'marking' && <Marking examId={exam.id} onNotice={setNotice} />}
+        {tab === 'marking' && <Marking examId={exam.id} />}
         {tab === 'insights' && <Insights examId={exam.id} />}
         {tab === 'fairness' && (
           <Fairness
@@ -210,7 +208,7 @@ export function ExamDeskPage() {
   )
 }
 
-function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise<void>; onNotice: (value: string) => void }) {
+function Setup({ exam, onSaved }: { exam: Desk; onSaved: () => Promise<void> }) {
   const [instructions, setInstructions] = useState(exam.instructions)
   const [windowEnd, setWindowEnd] = useState(toDateTimeLocal(exam.windowEnd))
   const [duration, setDuration] = useState(exam.durationMinutes)
@@ -237,10 +235,10 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
               },
         ),
       })
-      onNotice('Examination saved.')
+      notifySuccess('Examination saved.')
       await onSaved()
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not save')
+      notifyError(error instanceof Error ? error.message : 'Could not save')
     } finally {
       setSaving(false)
     }
@@ -250,10 +248,10 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
     setPublishing(true)
     try {
       await apiRequest(`/exams/${exam.id}/publish`, { method: 'POST' })
-      onNotice('Published. Candidates can enter when the window opens.')
+      notifySuccess('Published. Candidates can enter when the window opens.')
       await onSaved()
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not publish')
+      notifyError(error instanceof Error ? error.message : 'Could not publish')
     } finally {
       setPublishing(false)
     }
@@ -303,7 +301,7 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
   )
 }
 
-function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise<void>; onNotice: (value: string) => void }) {
+function Questions({ exam, onSaved }: { exam: Desk; onSaved: () => Promise<void> }) {
   const queryClient = useQueryClient()
   const bank = useQuery({ queryKey: ['questions'], queryFn: () => apiRequest<Question[]>('/questions') })
   const [bankOpen, setBankOpen] = useState(false)
@@ -331,10 +329,10 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
       const count = selected.length
       setSelected([])
       setBankOpen(false)
-      onNotice(count === 1 ? '1 question added to the paper.' : `${count} questions added to the paper.`)
+      notifySuccess(count === 1 ? '1 question added to the paper.' : `${count} questions added to the paper.`)
       await onSaved()
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not assign')
+      notifyError(error instanceof Error ? error.message : 'Could not assign')
       await onSaved()
     } finally {
       setAdding(false)
@@ -348,7 +346,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
       const question = known ?? (await apiRequest<Question>(`/questions/${questionId}`))
       setEditor({ mode: 'edit', question })
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not open that question')
+      notifyError(error instanceof Error ? error.message : 'Could not open that question')
     } finally {
       setOpeningId(null)
     }
@@ -364,7 +362,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
           body: JSON.stringify({ marks: payload.marks }),
         })
       }
-      onNotice('Question updated.')
+      notifySuccess('Question updated.')
     } else {
       const created = await apiRequest<Question>('/questions', { method: 'POST', body: JSON.stringify(payload) })
       await queryClient.invalidateQueries({ queryKey: ['questions'] })
@@ -374,7 +372,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
           body: JSON.stringify({ questionId: created.id, marks: payload.marks }),
         })
       }
-      onNotice(draft ? 'Question added to the paper.' : 'Question saved to the bank.')
+      notifySuccess(draft ? 'Question added to the paper.' : 'Question saved to the bank.')
     }
     await queryClient.invalidateQueries({ queryKey: ['questions'] })
     await onSaved()
@@ -438,9 +436,10 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
                       setRemovingId(question.questionId)
                       try {
                         await apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' })
+                        notifySuccess('Question removed from paper.')
                         await onSaved()
                       } catch (error) {
-                        onNotice(error instanceof Error ? error.message : 'Could not remove question')
+                        notifyError(error instanceof Error ? error.message : 'Could not remove question')
                       } finally {
                         setRemovingId(null)
                       }
@@ -504,7 +503,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
   )
 }
 
-function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise<void>; onNotice: (value: string) => void }) {
+function People({ exam, onSaved }: { exam: Desk; onSaved: () => Promise<void> }) {
   const queryClient = useQueryClient()
   const users = useQuery({
     queryKey: ['candidates'],
@@ -531,10 +530,10 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
       const count = selected.length
       setSelected([])
       setOpen(false)
-      onNotice(count === 1 ? '1 candidate enrolled.' : `${count} candidates enrolled.`)
+      notifySuccess(count === 1 ? '1 candidate enrolled.' : `${count} candidates enrolled.`)
       await onSaved()
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not enroll')
+      notifyError(error instanceof Error ? error.message : 'Could not enroll')
       await onSaved()
     } finally {
       setEnrolling(false)
@@ -574,9 +573,10 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
                 setRemovingId(person.candidateId)
                 try {
                   await apiRequest(`/exams/${exam.id}/enrollments/${person.candidateId}`, { method: 'DELETE' })
+                  notifySuccess('Candidate removed from examination.')
                   await onSaved()
                 } catch (error) {
-                  onNotice(error instanceof Error ? error.message : 'Could not remove candidate')
+                  notifyError(error instanceof Error ? error.message : 'Could not remove candidate')
                 } finally {
                   setRemovingId(null)
                 }
@@ -611,7 +611,7 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
           {panel === 'new' && (
             <CandidateForm
               onCreated={async (person) => {
-                onNotice(`${person.name} was added. ${person.passwordNote} Select them to enroll.`)
+                notifySuccess(`${person.name} was added. ${person.passwordNote} Select them to enroll.`)
                 setPanel('list')
                 await refreshDirectory()
               }}
@@ -622,7 +622,11 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
               onCancel={() => setPanel('list')}
               onAdded={async (result) => {
                 const problems = result.errors.map((error) => `Row ${error.row}: ${error.message}`).join(' ')
-                onNotice(`${result.passwordNote} Added ${result.created}. Select who should sit this examination. ${problems}`.trim())
+                if (result.created > 0) {
+                  notifySuccess(`${result.passwordNote} Added ${result.created}. Select who should sit this examination. ${problems}`.trim())
+                } else if (problems) {
+                  notifyError(problems)
+                }
                 setPanel('list')
                 await refreshDirectory()
               }}
@@ -729,7 +733,7 @@ function Monitor({ examId }: { examId: string }) {
   )
 }
 
-function Marking({ examId, onNotice }: { examId: string; onNotice: (value: string) => void }) {
+function Marking({ examId }: { examId: string }) {
   const queryClient = useQueryClient()
   const grading = useQuery({ queryKey: ['grading', examId], queryFn: () => apiRequest<Grading>(`/exams/${examId}/grading`) })
   const [publishing, setPublishing] = useState(false)
@@ -738,11 +742,11 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
     setPublishing(true)
     try {
       await apiRequest(`/exams/${examId}/publish-results`, { method: 'POST' })
-      onNotice('Results published. Candidates can now see their own scores.')
+      notifySuccess('Results published. Candidates can now see their own scores.')
       await queryClient.invalidateQueries({ queryKey: ['grading', examId] })
       await queryClient.invalidateQueries({ queryKey: ['exam', examId] })
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not publish')
+      notifyError(error instanceof Error ? error.message : 'Could not publish')
     } finally {
       setPublishing(false)
     }

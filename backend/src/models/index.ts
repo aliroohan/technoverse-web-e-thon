@@ -123,6 +123,8 @@ const attemptSchema = new Schema(
     writtenScore: { type: Number, default: 0 },
     totalScore: { type: Number, default: 0 },
     teacherComment: { type: String, default: '' },
+    activeSessionToken: { type: String, default: null },
+    activeSessionAt: { type: Date, default: null },
   },
   { timestamps: true },
 )
