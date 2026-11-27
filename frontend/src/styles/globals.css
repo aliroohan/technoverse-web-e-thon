@@ -1907,7 +1907,7 @@ tbody tr:last-child td {
 
 .main > section,
 .main > article {
-  animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pageEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .stat-tile,
