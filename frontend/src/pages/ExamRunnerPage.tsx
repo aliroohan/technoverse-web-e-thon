@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
+import { ScratchpadDrawer } from '../components/ScratchpadDrawer'
 import { Banner, Button, Dialog, Select } from '../components/ui'
 import { ApiError, apiRequest, socketOrigin } from '../lib/api-client'
 import { formatRemaining } from '../lib/format'
@@ -602,32 +603,24 @@ function Runner({
         </aside>
       </div>
       {scratchOpen && (
-        <aside className="drawer">
-          <div className="drawer-head">
-            <h2>Scratchpad</h2>
-            <button type="button" className="btn-icon" aria-label="Close scratchpad" onClick={() => setScratchOpen(false)}>
-              <X size={16} />
-            </button>
-          </div>
-          <p className="meta" style={{ margin: 0 }}>Rough work only — not graded.</p>
-          {scratchError && <Banner tone="error">{scratchError}</Banner>}
-          <textarea
-            value={scratchpad}
-            disabled={attempt.status !== 'in_progress'}
-            onChange={(event) => {
-              const text = event.target.value
-              setScratchpad(text)
-              setScratchError('')
-              window.clearTimeout(timers.current.scratch)
-              timers.current.scratch = window.setTimeout(() => {
-                void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }), silent: true })
-                  .catch((error: Error) => {
-                    setScratchError(error.message || 'Could not save scratchpad')
-                  })
-              }, 500)
-            }}
-          />
-        </aside>
+        <ScratchpadDrawer
+          attemptId={attempt.id}
+          text={scratchpad}
+          error={scratchError}
+          disabled={attempt.status !== 'in_progress'}
+          onClose={() => setScratchOpen(false)}
+          onTextChange={(text) => {
+            setScratchpad(text)
+            setScratchError('')
+            window.clearTimeout(timers.current.scratch)
+            timers.current.scratch = window.setTimeout(() => {
+              void apiRequest(`/attempts/${attempt.id}/scratchpad`, { method: 'PUT', body: JSON.stringify({ text }), silent: true })
+                .catch((error: Error) => {
+                  setScratchError(error.message || 'Could not save scratchpad')
+                })
+            }, 500)
+          }}
+        />
       )}
       {prefsOpen && (
         <Dialog title="Workspace" onClose={() => setPrefsOpen(false)}>
