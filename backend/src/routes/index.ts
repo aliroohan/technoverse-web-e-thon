@@ -5,13 +5,14 @@ import { authRouter } from './auth.routes.js'
 import { healthRouter } from './health.routes.js'
 import { preferenceRouter, reportRouter, resultRouter } from './result.routes.js'
 import { questionRouter } from './question.routes.js'
-import { userRouter } from './user.routes.js'
+import { candidateRouter, userRouter } from './user.routes.js'
 
 export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.use('/admin', adminRouter)
+apiRouter.use('/candidates', candidateRouter)
 apiRouter.use('/users', userRouter)
 apiRouter.use('/questions', questionRouter)
 apiRouter.use('/exams', examRouter)

@@ -12,6 +12,7 @@ import { AdminResultPaperPage } from '../pages/AdminResultPaperPage'
 import { AdminStudentLogPage } from '../pages/AdminStudentLogPage'
 import { AdminUsersPage } from '../pages/AdminUsersPage'
 import { CandidateHomePage } from '../pages/CandidateHomePage'
+import { CandidatesPage } from '../pages/CandidatesPage'
 import { ExamDeskPage } from '../pages/ExamDeskPage'
 import { ExamListPage } from '../pages/ExamListPage'
 import { ExamRunnerPage } from '../pages/ExamRunnerPage'
@@ -124,6 +125,13 @@ const questionsRoute = createRoute({
   component: QuestionBankPage,
 })
 
+const candidatesRoute = createRoute({
+  getParentRoute: () => dashboardRoute,
+  path: '/examiner/candidates',
+  beforeLoad: guard('examiner'),
+  component: CandidatesPage,
+})
+
 const candidateRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/candidate',
@@ -157,6 +165,7 @@ const routeTree = rootRoute.addChildren([
       examsRoute,
       examDeskRoute,
       questionsRoute,
+      candidatesRoute,
       candidateRoute,
       resultRoute,
     ]),

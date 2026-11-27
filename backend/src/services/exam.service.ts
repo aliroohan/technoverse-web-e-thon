@@ -380,6 +380,15 @@ export const updateQuestion = async (
   if (user.role === 'candidate') throw new HttpError(403, 'You do not have permission to do that')
   const question = await Question.findById(questionId)
   if (!question) throw new HttpError(404, 'Question not found')
+  const links = await ExamQuestion.find({ questionId }).select('examId')
+  if (links.length > 0) {
+    const started = await Exam.exists({
+      _id: { $in: links.map((link) => link.examId) },
+      publication: 'published',
+      windowStart: { $lte: new Date() },
+    })
+    if (started) throw new HttpError(400, 'This question is locked because an examination using it has started')
+  }
   if (input.stem !== undefined) question.stem = input.stem
   if (input.category !== undefined) question.category = input.category
   if (input.marks !== undefined) question.marks = input.marks

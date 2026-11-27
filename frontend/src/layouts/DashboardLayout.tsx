@@ -41,6 +41,9 @@ export function DashboardLayout() {
               <Link to="/examiner/questions" activeProps={{ className: 'active' }}>
                 Question bank
               </Link>
+              <Link to="/examiner/candidates" activeProps={{ className: 'active' }}>
+                Candidates
+              </Link>
             </>
           )}
           {user.role === 'candidate' && (

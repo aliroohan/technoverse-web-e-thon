@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Banner, Button, Field, Select, TextInput, Area } from '../components/ui'
+import { CandidateForm, CandidateImport, type DirectoryPerson } from '../components/CandidateTools'
+import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
+import { Banner, Button, Dialog, Drawer, Field, TextInput, Area } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen, toDateTimeLocal } from '../lib/format'
 import type { ExamSummary, Question } from '../types/domain'
@@ -75,13 +77,23 @@ type Preview = {
   }[]
 }
 
-const tabs = ['setup', 'questions', 'people', 'monitor', 'marking', 'insights', 'fairness'] as const
+const tabs = [
+  ['setup', 'setup'],
+  ['questions', 'Question paper'],
+  ['people', 'people'],
+  ['monitor', 'monitor'],
+  ['marking', 'marking'],
+  ['insights', 'insights'],
+  ['fairness', 'fairness'],
+] as const
+
+type Tab = (typeof tabs)[number][0]
 
 export function ExamDeskPage() {
   const { examId } = useParams({ strict: false }) as { examId: string }
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<(typeof tabs)[number]>('setup')
+  const [tab, setTab] = useState<Tab>('setup')
   const [notice, setNotice] = useState('')
   const desk = useQuery({
     queryKey: ['exam', examId],
@@ -101,9 +113,9 @@ export function ExamDeskPage() {
       <h1 className="page-title">{exam.title}</h1>
       {notice && <Banner>{notice}</Banner>}
       <div className="tabs" role="tablist">
-        {tabs.map((item) => (
+        {tabs.map(([item, label]) => (
           <button key={item} type="button" className="btn-ghost" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>
-            {item}
+            {label}
           </button>
         ))}
       </div>
@@ -205,20 +217,94 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
 }
 
 function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise<void>; onNotice: (value: string) => void }) {
+  const queryClient = useQueryClient()
   const bank = useQuery({ queryKey: ['questions'], queryFn: () => apiRequest<Question[]>('/questions') })
-  const [questionId, setQuestionId] = useState('')
+  const [bankOpen, setBankOpen] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [editor, setEditor] = useState<null | { mode: 'create' } | { mode: 'edit'; question: Question }>(null)
+  const draft = exam.publication === 'draft'
+  const canEdit = new Date(exam.windowStart).getTime() > Date.now()
+  const onPaper = new Set(exam.questions.map((question) => question.questionId))
 
-  const add = async () => {
+  const toggle = (id: string) => {
+    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
+  const addSelected = async () => {
     try {
-      await apiRequest(`/exams/${exam.id}/questions`, { method: 'POST', body: JSON.stringify({ questionId }) })
+      for (const questionId of selected) {
+        await apiRequest(`/exams/${exam.id}/questions`, { method: 'POST', body: JSON.stringify({ questionId }) })
+      }
+      setSelected([])
+      setBankOpen(false)
+      onNotice(selected.length === 1 ? '1 question added to the paper.' : `${selected.length} questions added to the paper.`)
       await onSaved()
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not assign')
+      await onSaved()
     }
+  }
+
+  const openEdit = async (questionId: string) => {
+    try {
+      const known = bank.data?.find((question) => question.id === questionId)
+      const question = known ?? (await apiRequest<Question>(`/questions/${questionId}`))
+      setEditor({ mode: 'edit', question })
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not open that question')
+    }
+  }
+
+  const saveQuestion = async (form: Parameters<typeof questionPayload>[0]) => {
+    const payload = questionPayload(form)
+    if (editor?.mode === 'edit') {
+      await apiRequest(`/questions/${editor.question.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+      if (draft) {
+        await apiRequest(`/exams/${exam.id}/questions/${editor.question.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ marks: payload.marks }),
+        })
+      }
+      onNotice('Question updated.')
+    } else {
+      const created = await apiRequest<Question>('/questions', { method: 'POST', body: JSON.stringify(payload) })
+      await queryClient.invalidateQueries({ queryKey: ['questions'] })
+      if (draft) {
+        await apiRequest(`/exams/${exam.id}/questions`, {
+          method: 'POST',
+          body: JSON.stringify({ questionId: created.id, marks: payload.marks }),
+        })
+      }
+      onNotice(draft ? 'Question added to the paper.' : 'Question saved to the bank.')
+    }
+    await queryClient.invalidateQueries({ queryKey: ['questions'] })
+    await onSaved()
+    setEditor(null)
   }
 
   return (
     <div className="stack">
+      {draft && (
+        <div className="row">
+          <Button type="button" onClick={() => setEditor({ mode: 'create' })}>
+            New question
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setSelected([])
+              setBankOpen(true)
+            }}
+          >
+            From the bank
+          </Button>
+        </div>
+      )}
+      {!canEdit && <p className="meta">Questions lock once the examination has started.</p>}
+      {canEdit && !draft && (
+        <p className="meta">You can still edit a question until the window opens. Adding or removing questions is locked after publication.</p>
+      )}
       <ul className="list">
         {exam.questions.map((question) => (
           <li className="card" key={question.questionId}>
@@ -227,44 +313,125 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
                 <strong>{question.stem}</strong>
                 <div className="meta">{question.type} · {question.category} · {question.difficulty} · {question.marks} marks {question.pinned ? '· pinned' : ''}</div>
               </div>
-              {exam.publication === 'draft' && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => void apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' }).then(onSaved)}
-                >
-                  Remove
-                </Button>
-              )}
+              <div className="row">
+                {canEdit && (
+                  <Button type="button" variant="ghost" onClick={() => void openEdit(question.questionId)}>
+                    Edit
+                  </Button>
+                )}
+                {draft && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => void apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' }).then(onSaved)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
             </div>
           </li>
         ))}
+        {exam.questions.length === 0 && <li className="meta">This paper has no questions yet.</li>}
       </ul>
-      {exam.publication === 'draft' && (
-        <div className="row">
-          <Select aria-label="Question to assign" value={questionId} onChange={(event) => setQuestionId(event.target.value)}>
-            <option value="">Choose a bank question</option>
-            {bank.data?.map((question) => (
-              <option key={question.id} value={question.id}>{question.stem}</option>
-            ))}
-          </Select>
-          <Button type="button" onClick={() => void add()} disabled={!questionId}>Assign</Button>
-        </div>
+      {bankOpen && (
+        <Drawer
+          title="Questions"
+          onClose={() => setBankOpen(false)}
+          footer={
+            <Button type="button" disabled={selected.length === 0} onClick={() => void addSelected()}>
+              {selected.length === 1 ? 'Add 1 question' : `Add ${selected.length} questions`}
+            </Button>
+          }
+        >
+          {bank.isLoading && <p className="meta">Loading questions…</p>}
+          {bank.data?.length === 0 && <p className="meta">The bank is empty. Create a question first.</p>}
+          {bank.data?.map((question) => {
+            const taken = onPaper.has(question.id)
+            return (
+              <label className="pick" key={question.id}>
+                <input
+                  type="checkbox"
+                  checked={taken || selected.includes(question.id)}
+                  disabled={taken}
+                  onChange={() => toggle(question.id)}
+                />
+                <span>
+                  <strong>{question.stem}</strong>
+                  <span className="meta">
+                    {question.type} · {question.category} · {question.difficulty} · {question.marks} marks
+                    {taken ? ' · on this paper' : ''}
+                  </span>
+                </span>
+              </label>
+            )
+          })}
+        </Drawer>
+      )}
+      {editor && (
+        <Dialog title={editor.mode === 'edit' ? 'Edit question' : 'New question'} onClose={() => setEditor(null)}>
+          <QuestionForm
+            key={editor.mode === 'edit' ? editor.question.id : 'new'}
+            initial={editor.mode === 'edit' ? questionToDraft(editor.question) : emptyQuestion()}
+            submitLabel={editor.mode === 'edit' ? 'Save changes' : 'Save question'}
+            submitBlock
+            onSubmit={saveQuestion}
+          />
+        </Dialog>
       )}
     </div>
   )
 }
 
 function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise<void>; onNotice: (value: string) => void }) {
+  const queryClient = useQueryClient()
   const users = useQuery({
     queryKey: ['candidates'],
-    queryFn: () => apiRequest<{ id: string; name: string; email: string; role: string }[]>('/users?role=candidate'),
+    queryFn: () => apiRequest<DirectoryPerson[]>('/users?role=candidate'),
   })
-  const [candidateId, setCandidateId] = useState('')
-  const [csv, setCsv] = useState('name,email')
+  const [open, setOpen] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [panel, setPanel] = useState<'list' | 'new' | 'import'>('list')
+  const enrolled = new Set(exam.enrollments.map((person) => person.candidateId))
+
+  const toggle = (id: string) => {
+    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
+  const enroll = async () => {
+    try {
+      for (const candidateId of selected) {
+        await apiRequest(`/exams/${exam.id}/enrollments`, { method: 'POST', body: JSON.stringify({ candidateId }) })
+      }
+      const count = selected.length
+      setSelected([])
+      setOpen(false)
+      onNotice(count === 1 ? '1 candidate enrolled.' : `${count} candidates enrolled.`)
+      await onSaved()
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not enroll')
+      await onSaved()
+    }
+  }
+
+  const refreshDirectory = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['candidates'] })
+  }
 
   return (
     <div className="stack">
+      <div className="row">
+        <Button
+          type="button"
+          onClick={() => {
+            setPanel('list')
+            setSelected([])
+            setOpen(true)
+          }}
+        >
+          Add candidates
+        </Button>
+      </div>
       <ul className="list">
         {exam.enrollments.map((person) => (
           <li className="card row" key={person.candidateId} style={{ justifyContent: 'space-between' }}>
@@ -282,46 +449,74 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
             </Button>
           </li>
         ))}
+        {exam.enrollments.length === 0 && <li className="meta">No one is enrolled yet.</li>}
       </ul>
-      <div className="row">
-        <Select aria-label="Candidate" value={candidateId} onChange={(event) => setCandidateId(event.target.value)}>
-          <option value="">Choose a candidate</option>
-          {users.data?.map((user) => (
-            <option key={user.id} value={user.id}>{user.name}</option>
-          ))}
-        </Select>
-        <Button
-          type="button"
-          disabled={!candidateId}
-          onClick={() =>
-            void apiRequest(`/exams/${exam.id}/enrollments`, { method: 'POST', body: JSON.stringify({ candidateId }) })
-              .then(onSaved)
-              .catch((error: Error) => onNotice(error.message))
+      {open && (
+        <Drawer
+          title="Candidates"
+          onClose={() => setOpen(false)}
+          footer={
+            panel === 'list' ? (
+              <Button type="button" disabled={selected.length === 0} onClick={() => void enroll()}>
+                {selected.length === 1 ? 'Enroll 1' : `Enroll ${selected.length}`}
+              </Button>
+            ) : undefined
           }
         >
-          Enroll
-        </Button>
-      </div>
-      {users.error && <Banner tone="error">Only an administrator can list every account. Ask an admin for candidate ids, or import a CSV below.</Banner>}
-      <form
-        className="panel stack"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void apiRequest<{ created: number; enrolled: number; errors: { row: number; message: string }[]; passwordNote: string }>(
-            `/exams/${exam.id}/candidates/import`,
-            { method: 'POST', body: JSON.stringify({ format: 'csv', content: csv }) },
-          )
-            .then((result) => {
-              onNotice(`${result.passwordNote} Created ${result.created}, enrolled ${result.enrolled}. ${result.errors.map((error) => `Row ${error.row}: ${error.message}`).join(' ')}`)
-              return onSaved()
-            })
-            .catch((error: Error) => onNotice(error.message))
-        }}
-      >
-        <h2>Import candidates</h2>
-        <Area value={csv} onChange={(event) => setCsv(event.target.value)} />
-        <Button type="submit" variant="ghost">Import CSV</Button>
-      </form>
+          <div className="row">
+            <Button type="button" variant={panel === 'new' ? 'solid' : 'ghost'} onClick={() => setPanel(panel === 'new' ? 'list' : 'new')}>
+              New candidate
+            </Button>
+            <Button type="button" variant={panel === 'import' ? 'solid' : 'ghost'} onClick={() => setPanel(panel === 'import' ? 'list' : 'import')}>
+              Import
+            </Button>
+          </div>
+          {panel === 'new' && (
+            <CandidateForm
+              onCreated={async (person) => {
+                onNotice(`${person.name} was added. ${person.passwordNote} Select them to enroll.`)
+                setPanel('list')
+                await refreshDirectory()
+              }}
+            />
+          )}
+          {panel === 'import' && (
+            <CandidateImport
+              onCancel={() => setPanel('list')}
+              onAdded={async (result) => {
+                const problems = result.errors.map((error) => `Row ${error.row}: ${error.message}`).join(' ')
+                onNotice(`${result.passwordNote} Added ${result.created}. Select who should sit this examination. ${problems}`.trim())
+                setPanel('list')
+                await refreshDirectory()
+              }}
+            />
+          )}
+          {panel === 'list' && (
+            <>
+              {users.error && <Banner tone="error">{users.error.message}</Banner>}
+              {users.isLoading && <p className="meta">Loading candidates…</p>}
+              {users.data?.length === 0 && <p className="meta">No candidates yet. Add one, or import a file.</p>}
+              {users.data?.map((person) => {
+                const taken = enrolled.has(person.id)
+                return (
+                  <label className="pick" key={person.id}>
+                    <input
+                      type="checkbox"
+                      checked={taken || selected.includes(person.id)}
+                      disabled={taken}
+                      onChange={() => toggle(person.id)}
+                    />
+                    <span>
+                      <strong>{person.name}</strong>
+                      <span className="meta">{person.email}{taken ? ' · enrolled' : ''}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </>
+          )}
+        </Drawer>
+      )}
     </div>
   )
 }

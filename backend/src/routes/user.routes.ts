@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { asAuthed, requireRole, requireUser } from '../middleware/auth.middleware.js'
-import { createUser, listUsers, updateUser } from '../services/user.service.js'
+import { importCandidates } from '../services/import.service.js'
+import { createCandidate, createUser, listUsers, updateUser } from '../services/user.service.js'
 import { roles } from '../types/domain.js'
 import { asyncHandler } from '../utils/async-handler.js'
 
@@ -18,6 +19,35 @@ const updateSchema = z.object({
   active: z.boolean().optional(),
   password: z.string().min(8).max(80).optional(),
 })
+
+const candidateSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: z.email(),
+})
+
+const importSchema = z.object({
+  format: z.enum(['csv', 'json']),
+  content: z.string().min(1),
+})
+
+export const candidateRouter = Router()
+candidateRouter.use(requireUser, requireRole('examiner', 'admin'))
+
+candidateRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const body = candidateSchema.parse(req.body)
+    res.status(201).json({ success: true, data: await createCandidate(body) })
+  }),
+)
+
+candidateRouter.post(
+  '/import',
+  asyncHandler(async (req, res) => {
+    const body = importSchema.parse(req.body)
+    res.json({ success: true, data: await importCandidates(asAuthed(req).user, body.format, body.content) })
+  }),
+)
 
 export const userRouter = Router()
 userRouter.use(requireUser)

@@ -1,17 +1,14 @@
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
-} from 'react'
+import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 
 export function Button({
   variant = 'solid',
+  block = false,
+  className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'solid' | 'ghost' | 'danger' }) {
-  const className = variant === 'ghost' ? 'btn-ghost' : variant === 'danger' ? 'btn-danger' : 'btn'
-  return <button className={className} {...props} />
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'solid' | 'ghost' | 'danger'; block?: boolean }) {
+  const variantClass = variant === 'ghost' ? 'btn-ghost' : variant === 'danger' ? 'btn-danger' : 'btn'
+  const classes = [variantClass, block ? 'btn-block' : '', className].filter(Boolean).join(' ')
+  return <button className={classes} {...props} />
 }
 
 export function Field({
@@ -46,6 +43,73 @@ export function Banner({ tone = 'info', children }: { tone?: 'info' | 'error' | 
     <p className={tone === 'error' ? 'banner error' : tone === 'ok' ? 'banner ok' : 'banner'} role={tone === 'error' ? 'alert' : 'status'}>
       {children}
     </p>
+  )
+}
+
+export function Dialog({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  const titleId = useId()
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="dialog-root">
+      <button type="button" className="dialog-backdrop" aria-label="Close" onClick={onClose} />
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="dialog-head">
+          <h2 id={titleId}>{title}</h2>
+          <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function Drawer({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  const titleId = useId()
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="sheet-root">
+      <button type="button" className="sheet-backdrop" aria-label="Close" onClick={onClose} />
+      <aside className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <header className="sheet-head">
+          <h2 id={titleId}>{title}</h2>
+          <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
+        </header>
+        <div className="sheet-body">{children}</div>
+        {footer && <footer className="sheet-foot">{footer}</footer>}
+      </aside>
+    </div>
   )
 }
 

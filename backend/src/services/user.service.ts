@@ -16,6 +16,18 @@ export const listUsers = async (role?: Role) => {
   return users.map(publicUser)
 }
 
+const CANDIDATE_PASSWORD = 'Candidate123!'
+
+export const createCandidate = async (input: { name: string; email: string }) => {
+  const user = await createUser({
+    name: input.name,
+    email: input.email,
+    password: CANDIDATE_PASSWORD,
+    role: 'candidate',
+  })
+  return { ...user, passwordNote: `New candidates can sign in with ${CANDIDATE_PASSWORD}` }
+}
+
 export const createUser = async (input: { name: string; email: string; password: string; role: Role }) => {
   const existing = await User.findOne({ email: input.email.toLowerCase() })
   if (existing) throw new HttpError(409, 'An account with that email already exists')
