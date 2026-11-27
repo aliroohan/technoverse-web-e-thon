@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 
 export function Button({
@@ -134,11 +135,27 @@ export function Pagination({
       </span>
       {totalPages > 1 && (
         <div className="row">
-          <Button type="button" variant="ghost" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-            Previous
+          <Button
+            type="button"
+            variant="ghost"
+            className="btn-icon"
+            aria-label="Previous page"
+            title="Previous page"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          >
+            <ChevronLeft size={16} strokeWidth={1.8} aria-hidden="true" />
           </Button>
-          <Button type="button" variant="ghost" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-            Next
+          <Button
+            type="button"
+            variant="ghost"
+            className="btn-icon"
+            aria-label="Next page"
+            title="Next page"
+            disabled={page >= totalPages}
+            onClick={() => onPageChange(page + 1)}
+          >
+            <ChevronRight size={16} strokeWidth={1.8} aria-hidden="true" />
           </Button>
         </div>
       )}

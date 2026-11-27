@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Search, Shield, UserCheck, UserPlus, Users, UserX, X } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Banner, Button, Field, Select, TextInput } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
@@ -70,12 +71,12 @@ export function AdminUsersPage() {
       <div className="admin-header">
         <div>
           <h1 className="page-title">People</h1>
-          <p className="lede" style={{ marginBottom: '0.25rem' }}>
-            Administrators create accounts and assign roles. Deactivated people cannot sign in.
-          </p>
-          <p className="meta" style={{ margin: 0 }}>
-            {counts.total} total · {counts.admin} admin · {counts.examiner} examiner · {counts.candidate} candidates
-          </p>
+          <div className="meta-row">
+            <span className="meta-chip"><Users size={14} /> {counts.total}</span>
+            <span className="meta-chip"><Shield size={14} /> {counts.admin} admin</span>
+            <span className="meta-chip">{counts.examiner} examiner</span>
+            <span className="meta-chip">{counts.candidate} candidates</span>
+          </div>
         </div>
         <Button
           type="button"
@@ -85,7 +86,8 @@ export function AdminUsersPage() {
             setNotice(null)
           }}
         >
-          {showCreate ? 'Close form' : 'Create account'}
+          {showCreate ? <X size={16} /> : <UserPlus size={16} />}
+          {showCreate ? 'Close' : 'Create account'}
         </Button>
       </div>
 
@@ -95,7 +97,15 @@ export function AdminUsersPage() {
         <form className="panel stack compact-form" onSubmit={submit}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>New account</h2>
-            <span className="meta">Minimum 8-character password</span>
+            <Button
+              type="button"
+              variant="ghost"
+              className="btn-icon"
+              aria-label="Close form"
+              onClick={() => setShowCreate(false)}
+            >
+              <X size={16} />
+            </Button>
           </div>
           <div className="compact-grid">
             <Field label="Full name">
@@ -106,7 +116,7 @@ export function AdminUsersPage() {
                 required
               />
             </Field>
-            <Field label="Email address">
+            <Field label="Email">
               <TextInput
                 type="email"
                 placeholder="zara@holdfast.test"
@@ -115,11 +125,11 @@ export function AdminUsersPage() {
                 required
               />
             </Field>
-            <Field label="Temporary password">
+            <Field label="Password (min 8)">
               <TextInput
                 type="text"
                 minLength={8}
-                placeholder="At least 8 characters"
+                placeholder="Temporary password"
                 value={form.password}
                 onChange={(event) => setForm({ ...form, password: event.target.value })}
                 required
@@ -134,27 +144,29 @@ export function AdminUsersPage() {
             </Field>
           </div>
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-            <Button
-              type="button"
-              variant="ghost"
-              className="btn-ghost btn-sm"
-              onClick={() => setShowCreate(false)}
-            >
+            <Button type="button" variant="ghost" className="btn-sm" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="btn btn-sm" disabled={create.isPending}>
-              {create.isPending ? 'Creating…' : 'Create account'}
+            <Button type="submit" className="btn-sm" disabled={create.isPending}>
+              <UserPlus size={15} />
+              {create.isPending ? 'Creating…' : 'Create'}
             </Button>
           </div>
         </form>
       )}
 
       <div className="row">
-        <div style={{ flex: 1, minWidth: '220px' }}>
+        <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+          <Search
+            size={15}
+            aria-hidden="true"
+            style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-soft)', pointerEvents: 'none' }}
+          />
           <TextInput
             className="compact-input"
+            style={{ paddingLeft: '2.1rem' }}
             aria-label="Search people"
-            placeholder="Filter by name or email…"
+            placeholder="Search name or email…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -172,11 +184,11 @@ export function AdminUsersPage() {
         </Select>
       </div>
 
-      {users.isPending && <p className="meta">Loading people…</p>}
+      {users.isPending && <p className="meta">Loading…</p>}
       {users.error && <Banner tone="error">{users.error.message}</Banner>}
 
       {users.data && filtered.length === 0 ? (
-        <Banner>No accounts match the current filter.</Banner>
+        <Banner>No matching accounts.</Banner>
       ) : (
         <div className="panel" style={{ overflowX: 'auto' }}>
           <table>
@@ -216,10 +228,12 @@ export function AdminUsersPage() {
                     <Button
                       type="button"
                       variant="ghost"
-                      className="btn-ghost btn-sm"
+                      className="btn-icon"
+                      aria-label={user.active ? `Deactivate ${user.name}` : `Activate ${user.name}`}
+                      title={user.active ? 'Deactivate' : 'Activate'}
                       onClick={() => update.mutate({ id: user.id, active: !user.active })}
                     >
-                      {user.active ? 'Deactivate' : 'Activate'}
+                      {user.active ? <UserX size={16} /> : <UserCheck size={16} />}
                     </Button>
                   </td>
                 </tr>

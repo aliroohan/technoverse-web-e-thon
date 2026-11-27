@@ -1,6 +1,25 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useState } from 'react'
+import {
+  Activity,
+  BarChart2,
+  Calendar,
+  Check,
+  CheckSquare,
+  Clock,
+  FileText,
+  Layers,
+  Pencil,
+  Play,
+  Plus,
+  Scale,
+  Send,
+  SlidersHorizontal,
+  Trash2,
+  UserPlus,
+  Users,
+} from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { CandidateForm, CandidateImport, type DirectoryPerson } from '../components/CandidateTools'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
 import { Banner, Button, Dialog, Drawer, Field, TextInput, Area } from '../components/ui'
@@ -79,17 +98,17 @@ type Preview = {
   }[]
 }
 
-const tabs = [
-  ['setup', 'setup'],
-  ['questions', 'Question paper'],
-  ['people', 'people'],
-  ['monitor', 'monitor'],
-  ['marking', 'marking'],
-  ['insights', 'insights'],
-  ['fairness', 'fairness'],
-] as const
+const tabs: readonly { id: 'setup' | 'questions' | 'people' | 'monitor' | 'marking' | 'insights' | 'fairness'; label: string; icon: ReactNode }[] = [
+  { id: 'setup', label: 'Setup', icon: <SlidersHorizontal size={15} /> },
+  { id: 'questions', label: 'Paper', icon: <FileText size={15} /> },
+  { id: 'people', label: 'People', icon: <Users size={15} /> },
+  { id: 'monitor', label: 'Monitor', icon: <Activity size={15} /> },
+  { id: 'marking', label: 'Marking', icon: <CheckSquare size={15} /> },
+  { id: 'insights', label: 'Insights', icon: <BarChart2 size={15} /> },
+  { id: 'fairness', label: 'Fairness', icon: <Scale size={15} /> },
+]
 
-type Tab = (typeof tabs)[number][0]
+type Tab = (typeof tabs)[number]['id']
 
 export function ExamDeskPage() {
   const { examId } = useParams({ strict: false }) as { examId: string }
@@ -106,18 +125,25 @@ export function ExamDeskPage() {
     await queryClient.invalidateQueries({ queryKey: ['exam', examId] })
   }
 
-  if (!desk.data) return <p>Loading the desk…</p>
+  if (!desk.data) return <p className="meta">Loading…</p>
   const exam = desk.data
 
   return (
     <section>
-      <p className="meta">{exam.lifecycle}{exam.resultsPublished ? ' · results published' : ''}</p>
+      <p className="meta">{exam.lifecycle}{exam.resultsPublished ? ' · published' : ''}</p>
       <h1 className="page-title">{exam.title}</h1>
       {notice && <Banner>{notice}</Banner>}
       <div className="tabs" role="tablist">
-        {tabs.map(([item, label]) => (
-          <button key={item} type="button" className="btn-ghost" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>
-            {label}
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="btn-ghost"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+          >
+            {item.icon} {item.label}
           </button>
         ))}
       </div>
@@ -183,7 +209,10 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
 
   return (
     <div className="panel stack">
-      <p className="meta">Opens {formatWhen(exam.windowStart)} · closes {formatWhen(exam.windowEnd)} · {exam.durationMinutes} min</p>
+      <div className="meta-row">
+        <span className="meta-chip"><Calendar size={14} /> {formatWhen(exam.windowStart)} – {formatWhen(exam.windowEnd)}</span>
+        <span className="meta-chip"><Clock size={14} /> {exam.durationMinutes}m</span>
+      </div>
       <Field label="Instructions">
         <Area value={instructions} onChange={(event) => setInstructions(event.target.value)} />
       </Field>
@@ -199,19 +228,19 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
             <input type="checkbox" checked={fairPaper} onChange={(event) => setFairPaper(event.target.checked)} />
             Fair paper (difficulty budget)
           </label>
-          <Field label="Questions on each paper, including pinned">
+          <Field label="Questions per paper">
             <TextInput type="number" min={1} value={questionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} />
           </Field>
-          <Field label="Difficulty budget for the sampled questions">
+          <Field label="Difficulty budget">
             <TextInput type="number" min={1} value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
           </Field>
         </>
       )}
-      {locked && <p className="meta">Duration, the question set, and fairness settings are locked. You can still extend the close time.</p>}
+      {locked && <p className="meta">Settings locked after publish; close time can still be extended.</p>}
       <div className="row">
-        <Button type="button" onClick={() => void save()}>Save</Button>
+        <Button type="button" onClick={() => void save()}><Check size={15} /> Save</Button>
         {exam.publication === 'draft' && (
-          <Button type="button" variant="ghost" onClick={() => void publish()}>Publish</Button>
+          <Button type="button" variant="ghost" onClick={() => void publish()}><Send size={15} /> Publish</Button>
         )}
       </div>
     </div>
@@ -224,8 +253,9 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
   const [bankOpen, setBankOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [editor, setEditor] = useState<null | { mode: 'create' } | { mode: 'edit'; question: Question }>(null)
+  const [now] = useState(() => Date.now())
   const draft = exam.publication === 'draft'
-  const canEdit = new Date(exam.windowStart).getTime() > Date.now()
+  const canEdit = new Date(exam.windowStart).getTime() > now
   const onPaper = new Set(exam.questions.map((question) => question.questionId))
 
   const toggle = (id: string) => {
@@ -289,7 +319,7 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
       {draft && (
         <div className="row">
           <Button type="button" onClick={() => setEditor({ mode: 'create' })}>
-            New question
+            <Plus size={15} /> New question
           </Button>
           <Button
             type="button"
@@ -299,42 +329,52 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
               setBankOpen(true)
             }}
           >
-            From the bank
+            <Layers size={15} /> From bank
           </Button>
         </div>
       )}
-      {!canEdit && <p className="meta">Questions lock once the examination has started.</p>}
+      {!canEdit && <p className="meta">Locked after exam start.</p>}
       {canEdit && !draft && (
-        <p className="meta">You can still edit a question until the window opens. Adding or removing questions is locked after publication.</p>
+        <p className="meta">Published: question text can still be edited until start.</p>
       )}
       <ul className="list">
         {exam.questions.map((question) => (
           <li className="card" key={question.questionId}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
               <div>
                 <strong>{question.stem}</strong>
-                <div className="meta">{question.type} · {question.category} · {question.difficulty} · {question.marks} marks {question.pinned ? '· pinned' : ''}</div>
+                <div className="meta">{question.type} · {question.category} · {question.difficulty} · {question.marks} pts {question.pinned ? '· pinned' : ''}</div>
               </div>
-              <div className="row">
+              <div className="row" style={{ flexWrap: 'nowrap' }}>
                 {canEdit && (
-                  <Button type="button" variant="ghost" onClick={() => void openEdit(question.questionId)}>
-                    Edit
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="btn-icon"
+                    aria-label={`Edit ${question.stem}`}
+                    title="Edit"
+                    onClick={() => void openEdit(question.questionId)}
+                  >
+                    <Pencil size={15} />
                   </Button>
                 )}
                 {draft && (
                   <Button
                     type="button"
                     variant="ghost"
+                    className="btn-icon"
+                    aria-label={`Remove ${question.stem}`}
+                    title="Remove"
                     onClick={() => void apiRequest(`/exams/${exam.id}/questions/${question.questionId}`, { method: 'DELETE' }).then(onSaved)}
                   >
-                    Remove
+                    <Trash2 size={15} />
                   </Button>
                 )}
               </div>
             </div>
           </li>
         ))}
-        {exam.questions.length === 0 && <li className="meta">This paper has no questions yet.</li>}
+        {exam.questions.length === 0 && <li className="meta">No questions yet.</li>}
       </ul>
       {bankOpen && (
         <Drawer
@@ -431,7 +471,7 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
             setOpen(true)
           }}
         >
-          Add candidates
+          <UserPlus size={15} /> Add candidates
         </Button>
       </div>
       <ul className="list">
@@ -441,17 +481,20 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
             <Button
               type="button"
               variant="ghost"
+              className="btn-icon"
+              aria-label={`Remove ${person.name}`}
+              title="Remove"
               onClick={() =>
                 void apiRequest(`/exams/${exam.id}/enrollments/${person.candidateId}`, { method: 'DELETE' })
                   .then(onSaved)
                   .catch((error: Error) => onNotice(error.message))
               }
             >
-              Remove
+              <Trash2 size={15} />
             </Button>
           </li>
         ))}
-        {exam.enrollments.length === 0 && <li className="meta">No one is enrolled yet.</li>}
+        {exam.enrollments.length === 0 && <li className="meta">No enrollments yet.</li>}
       </ul>
       {open && (
         <Drawer
@@ -560,7 +603,7 @@ function Monitor({ examId }: { examId: string }) {
         }}
       >
         <TextInput aria-label="Announcement" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Announcement to the room" />
-        <Button type="submit">Send</Button>
+        <Button type="submit"><Send size={15} /> Send</Button>
       </form>
       <ul className="list">
         {incidents.data?.incidents.map((incident) => (
@@ -709,16 +752,16 @@ function Fairness({ examId, onSandbox }: { examId: string; onSandbox: () => Prom
 
   return (
     <div className="stack">
-      <p className="lede">Two draws from the same bank. Pinned questions stay. The rest are chosen so the difficulty weights stay near the budget. Sandbox attempts never enter these statistics.</p>
+      <p className="meta">Two difficulty-balanced draws from the bank. Sandbox attempts are excluded from statistics.</p>
       <div className="row">
         <Button
           type="button"
           onClick={() => void apiRequest<Preview>(`/exams/${examId}/preview-papers`, { method: 'POST' }).then(setPreview)}
         >
-          Preview two papers
+          <Scale size={15} /> Preview papers
         </Button>
         <Button type="button" variant="ghost" onClick={() => void onSandbox()}>
-          Open sandbox
+          <Play size={15} /> Sandbox
         </Button>
       </div>
       <div className="grid two">
