@@ -122,6 +122,7 @@ const attemptSchema = new Schema(
     objectiveScore: { type: Number, default: 0 },
     writtenScore: { type: Number, default: 0 },
     totalScore: { type: Number, default: 0 },
+    teacherComment: { type: String, default: '' },
   },
   { timestamps: true },
 )

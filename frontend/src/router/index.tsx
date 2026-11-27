@@ -8,6 +8,8 @@ import {
 import type { QueryClient } from '@tanstack/react-query'
 import { DashboardLayout } from '../layouts/DashboardLayout'
 import { fetchMe, homeFor } from '../lib/session'
+import { AdminResultPaperPage } from '../pages/AdminResultPaperPage'
+import { AdminStudentLogPage } from '../pages/AdminStudentLogPage'
 import { AdminUsersPage } from '../pages/AdminUsersPage'
 import { CandidateHomePage } from '../pages/CandidateHomePage'
 import { ExamDeskPage } from '../pages/ExamDeskPage'
@@ -87,6 +89,20 @@ const adminRoute = createRoute({
   component: AdminUsersPage,
 })
 
+const adminLogsRoute = createRoute({
+  getParentRoute: () => dashboardRoute,
+  path: '/admin/logs',
+  beforeLoad: guard('admin'),
+  component: AdminStudentLogPage,
+})
+
+const adminLogPaperRoute = createRoute({
+  getParentRoute: () => dashboardRoute,
+  path: '/admin/logs/$examId',
+  beforeLoad: guard('admin'),
+  component: AdminResultPaperPage,
+})
+
 const examsRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/examiner/exams',
@@ -136,6 +152,8 @@ const routeTree = rootRoute.addChildren([
     dashboardRoute.addChildren([
       indexRoute,
       adminRoute,
+      adminLogsRoute,
+      adminLogPaperRoute,
       examsRoute,
       examDeskRoute,
       questionsRoute,

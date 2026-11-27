@@ -13,6 +13,7 @@ type Result = {
   objectiveScore: number
   writtenScore: number
   submittedAt: string | null
+  teacherComment?: string
   verificationCode: string | null
   questions: { questionId: string; stem: string; type: string; marks: number; awarded?: number | null; comment: string }[]
 }
@@ -40,6 +41,11 @@ export function ResultPage() {
       {data.verificationCode && (
         <p className="banner ok">
           Verification code <strong>{data.verificationCode}</strong>. Anyone can confirm this report without seeing your email or your answers.
+        </p>
+      )}
+      {data.teacherComment && (
+        <p className="banner">
+          <strong>Teacher's comment:</strong> {data.teacherComment}
         </p>
       )}
       <ul className="list">

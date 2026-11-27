@@ -24,9 +24,14 @@ export function DashboardLayout() {
         </Link>
         <nav className="nav" aria-label="Primary">
           {user.role === 'admin' && (
-            <Link to="/admin/users" activeProps={{ className: 'active' }}>
-              People
-            </Link>
+            <>
+              <Link to="/admin/users" activeProps={{ className: 'active' }}>
+                People
+              </Link>
+              <Link to="/admin/logs" activeProps={{ className: 'active' }}>
+                Student log
+              </Link>
+            </>
           )}
           {user.role === 'examiner' && (
             <>

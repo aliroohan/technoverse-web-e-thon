@@ -58,6 +58,7 @@ export const resultDetail = async (user: SessionUser, attemptId: string) => {
     writtenScore: attempt.writtenScore,
     totalMarks: attempt.questionSnapshots.reduce((sum, item) => sum + item.marks, 0),
     submittedAt: attempt.submittedAt,
+    teacherComment: attempt.teacherComment ?? '',
     verificationCode: verification?.code ?? null,
     questions: attempt.questionSnapshots.map((snapshot) => {
       const grade = grades.find((item) => item.questionId === snapshot.questionId)

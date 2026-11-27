@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { adminRouter } from './admin.routes.js'
 import { attemptRouter, examRouter, gradingRouter } from './exam.routes.js'
 import { authRouter } from './auth.routes.js'
 import { healthRouter } from './health.routes.js'
@@ -10,6 +11,7 @@ export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
+apiRouter.use('/admin', adminRouter)
 apiRouter.use('/users', userRouter)
 apiRouter.use('/questions', questionRouter)
 apiRouter.use('/exams', examRouter)
