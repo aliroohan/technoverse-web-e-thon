@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Award, Check, Layers, Pencil, Plus, Search, Tag, Trash2 } from 'lucide-react'
+import { Award, Check, Layers, Pencil, Plus, Search, Tag, Trash2, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
-import { Banner, Button, Select, TextInput } from '../components/ui'
+import { Banner, Button, Field, Select, TextInput } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import type { Question } from '../types/domain'
 
@@ -12,12 +12,16 @@ const difficultyTone = (difficulty: Question['difficulty']) =>
 export function QuestionBankPage() {
   const queryClient = useQueryClient()
   const questions = useQuery({ queryKey: ['questions'], queryFn: () => apiRequest<Question[]>('/questions') })
-  const [formMode, setFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
+  const [formMode, setFormMode] = useState<'closed' | 'create' | 'edit' | 'import'>('closed')
   const [editing, setEditing] = useState<Question | null>(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'' | Question['type']>('')
   const [difficultyFilter, setDifficultyFilter] = useState<'' | Question['difficulty']>('')
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
+  const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv')
+  const [importContent, setImportContent] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importErrors, setImportErrors] = useState<{ row: number; message: string }[]>([])
 
   const remove = useMutation({
     mutationFn: (id: string) => apiRequest(`/questions/${id}`, { method: 'DELETE' }),
@@ -78,22 +82,112 @@ export function QuestionBankPage() {
           </div>
         </div>
         {!formOpen && (
-          <Button
-            type="button"
-            onClick={() => {
-              setEditing(null)
-              setFormMode('create')
-              setNotice(null)
-            }}
-          >
-            <Plus size={16} /> New question
-          </Button>
+          <div className="row">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setEditing(null)
+                setImportErrors([])
+                setFormMode('import')
+                setNotice(null)
+              }}
+            >
+              <Upload size={16} /> Import CSV / JSON
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setEditing(null)
+                setFormMode('create')
+                setNotice(null)
+              }}
+            >
+              <Plus size={16} /> New question
+            </Button>
+          </div>
         )}
       </div>
 
       {notice && <Banner tone={notice.tone}>{notice.text}</Banner>}
 
-      {formOpen && (
+      {formMode === 'import' && (
+        <div className="panel stack">
+          <h2 style={{ margin: 0 }}>Bulk import questions</h2>
+          <p className="meta" style={{ margin: 0 }}>
+            CSV columns: <code>stem, type, category, difficulty, marks, choices, correctIndexes</code> (choices separated by <code>|</code>). Or upload a JSON array.
+          </p>
+          <div className="row">
+            <Field label="File (.csv or .json)">
+              <input
+                type="file"
+                accept=".csv,text/csv,.json,application/json"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0]
+                  if (!file) return
+                  setImportFormat(file.name.toLowerCase().endsWith('.json') ? 'json' : 'csv')
+                  setImportContent(await file.text())
+                  setImportErrors([])
+                }}
+              />
+            </Field>
+            <Field label="Format">
+              <Select value={importFormat} onChange={(event) => setImportFormat(event.target.value as 'csv' | 'json')}>
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Or paste CSV / JSON">
+            <textarea
+              rows={5}
+              value={importContent}
+              onChange={(event) => setImportContent(event.target.value)}
+              placeholder="stem,type,category,difficulty,marks,choices,correctIndexes"
+            />
+          </Field>
+          {importErrors.length > 0 && (
+            <Banner tone="error">
+              Skipped {importErrors.length} row(s): {importErrors.slice(0, 3).map((e) => `Row ${e.row}: ${e.message}`).join(' · ')}
+            </Banner>
+          )}
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => setFormMode('closed')}>Cancel</Button>
+            <Button
+              type="button"
+              disabled={importing || !importContent.trim()}
+              onClick={async () => {
+                setImporting(true)
+                setImportErrors([])
+                try {
+                  const res = await apiRequest<{ created: number; errors: { row: number; message: string }[] }>('/questions/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ format: importFormat, content: importContent }),
+                  })
+                  setImportErrors(res.errors)
+                  setNotice({
+                    tone: res.created > 0 ? 'ok' : 'error',
+                    text: `Imported ${res.created} question(s)${res.errors.length ? `, ${res.errors.length} row(s) had errors` : '.'}`,
+                  })
+                  await queryClient.invalidateQueries({ queryKey: ['questions'] })
+                  if (res.errors.length === 0) {
+                    setImportContent('')
+                    setFormMode('closed')
+                  }
+                } catch (err) {
+                  setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Import failed' })
+                } finally {
+                  setImporting(false)
+                }
+              }}
+            >
+              <Upload size={15} /> {importing ? 'Importing…' : 'Import questions'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {(formMode === 'create' || formMode === 'edit') && (
         <div className="panel">
           <QuestionForm
             key={editing?.id ?? 'new'}

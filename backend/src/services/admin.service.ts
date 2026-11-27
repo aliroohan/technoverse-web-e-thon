@@ -328,6 +328,8 @@ export const listStudentLogs = async (input: {
   if (input.candidateId) candidateIdsFilter = [input.candidateId]
   if (input.examId) examIdsFilter = [input.examId]
 
+  let attemptOr: Record<string, unknown>[] | null = null
+
   if (search) {
     const regex = { $regex: escapeRegex(search), $options: 'i' }
     const [matchedUsers, matchedExams] = await Promise.all([
@@ -338,7 +340,7 @@ export const listStudentLogs = async (input: {
     const matchedExamIds = matchedExams.map((e) => e._id.toString())
 
     // Match attempts/incidents where EITHER student matches OR exam matches
-    const attemptOr: Record<string, unknown>[] = []
+    attemptOr = []
     if (matchedUserIds.length > 0) attemptOr.push({ candidateId: { $in: matchedUserIds } })
     if (matchedExamIds.length > 0) attemptOr.push({ examId: { $in: matchedExamIds } })
 
@@ -354,6 +356,7 @@ export const listStudentLogs = async (input: {
   const attemptFilter: Record<string, unknown> = { isSandbox: false }
   if (candidateIdsFilter) attemptFilter.candidateId = { $in: candidateIdsFilter }
   if (examIdsFilter) attemptFilter.examId = { $in: examIdsFilter }
+  if (attemptOr && attemptOr.length > 0) attemptFilter.$or = attemptOr
 
   const allMatchingAttempts = await Attempt.find(attemptFilter).sort({ startedAt: -1 })
   const allAttemptUsers = await User.find({

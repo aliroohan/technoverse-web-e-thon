@@ -6,17 +6,21 @@ import { loadOwnedExam } from './access.js'
 import { round2 } from './marking.js'
 
 export const issueCode = async (attemptId: string) => {
-  const existing = await ReportVerification.findOne({ attemptId })
-  if (existing) return existing.code
   const code = randomBytes(4).toString('hex')
-  await ReportVerification.create({
-    attemptId,
-    code,
-    codeHash: createHash('sha256').update(code).digest('hex'),
-    issuedAt: new Date(),
-    revoked: false,
-  })
-  return code
+  const doc = await ReportVerification.findOneAndUpdate(
+    { attemptId },
+    {
+      $setOnInsert: {
+        attemptId,
+        code,
+        codeHash: createHash('sha256').update(code).digest('hex'),
+        issuedAt: new Date(),
+        revoked: false,
+      },
+    },
+    { upsert: true, returnDocument: 'after' },
+  )
+  return doc.code
 }
 
 export const recomputeWritten = async (attemptId: string) => {
@@ -150,13 +154,4 @@ export const publishResults = async (user: SessionUser, examId: string) => {
   exam.resultsPublished = true
   await exam.save()
   return { resultsPublished: true, issued: codes }
-}
-
-export const rememberCode = async (attemptId: string, code: string) => {
-  const codeHash = createHash('sha256').update(code).digest('hex')
-  await ReportVerification.findOneAndUpdate(
-    { attemptId },
-    { $setOnInsert: { attemptId, codeHash, issuedAt: new Date(), revoked: false } },
-    { upsert: true },
-  )
 }

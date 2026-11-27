@@ -22,12 +22,26 @@ export const finalizeAttempt = async (attemptId: string, reason: 'submit' | 'exp
   if (!current) throw new HttpError(404, 'Attempt not found')
   if (current.status !== 'in_progress') return current
 
+  const hasWritten = current.questionSnapshots.some((snapshot) => snapshot.type === 'written')
+  const claimedStatus = hasWritten ? (reason === 'expired' ? 'expired' : 'submitted') : 'graded'
+  const claimed = await Attempt.findOneAndUpdate(
+    { _id: attemptId, status: 'in_progress' },
+    {
+      $set: {
+        status: claimedStatus,
+        gradingStatus: hasWritten ? 'pending_subjective' : 'ready',
+        submittedAt: new Date(),
+      },
+    },
+    { returnDocument: 'after' },
+  )
+  if (!claimed) return await Attempt.findById(attemptId)
+
   const answers = await Answer.find({ attemptId })
   const answerByQuestion = new Map(answers.map((answer) => [answer.questionId, answer]))
   let objectiveScore = 0
-  let pendingWritten = false
 
-  for (const snapshot of current.questionSnapshots) {
+  for (const snapshot of claimed.questionSnapshots) {
     const answer = answerByQuestion.get(snapshot.questionId)
     const score = scoreObjective({
       type: snapshot.type,
@@ -35,18 +49,13 @@ export const finalizeAttempt = async (attemptId: string, reason: 'submit' | 'exp
       marks: snapshot.marks,
       choiceIds: answer?.choiceIds ?? [],
     })
-    if (score === null) pendingWritten = true
-    else objectiveScore += score
+    if (score !== null) objectiveScore += score
   }
 
-  const status = pendingWritten ? (reason === 'expired' ? 'expired' : 'submitted') : 'graded'
-  const updated = await Attempt.findOneAndUpdate(
-    { _id: attemptId, status: 'in_progress' },
+  return await Attempt.findByIdAndUpdate(
+    attemptId,
     {
       $set: {
-        status,
-        gradingStatus: pendingWritten ? 'pending_subjective' : 'ready',
-        submittedAt: new Date(),
         objectiveScore,
         writtenScore: 0,
         totalScore: objectiveScore,
@@ -54,7 +63,6 @@ export const finalizeAttempt = async (attemptId: string, reason: 'submit' | 'exp
     },
     { returnDocument: 'after' },
   )
-  return updated ?? (await Attempt.findById(attemptId))
 }
 
 const ownAttempt = async (attemptId: string, user: SessionUser) => {
@@ -188,7 +196,13 @@ export const startSandbox = async (user: SessionUser, examId: string) => {
 export const saveAnswer = async (
   user: SessionUser,
   attemptId: string,
-  input: { questionId: string; choiceIds?: string[]; text?: string; flaggedForReview?: boolean },
+  input: {
+    questionId: string
+    choiceIds?: string[]
+    text?: string
+    flaggedForReview?: boolean
+    expectedVersion?: number
+  },
 ) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.candidateId.toString() !== user.id) {
@@ -216,6 +230,19 @@ export const saveAnswer = async (
   }
 
   const existing = await Answer.findOne({ attemptId, questionId: input.questionId })
+  if (
+    input.expectedVersion !== undefined &&
+    existing &&
+    existing.version > input.expectedVersion
+  ) {
+    throw new HttpError(409, 'A newer answer has already been saved on the server')
+  }
+
+  const stillActive = await Attempt.exists({ _id: attemptId, status: 'in_progress' })
+  if (!stillActive) {
+    throw new HttpError(409, 'This attempt is already finalized')
+  }
+
   const saved = await Answer.findOneAndUpdate(
     { attemptId, questionId: input.questionId },
     {
@@ -229,6 +256,11 @@ export const saveAnswer = async (
     },
     { upsert: true, returnDocument: 'after' },
   )
+
+  const activeAfterSave = await Attempt.exists({ _id: attemptId, status: 'in_progress' })
+  if (!activeAfterSave) {
+    throw new HttpError(409, 'This attempt was finalized while saving')
+  }
 
   await redisCall((redis) =>
     redis.hset(
@@ -279,6 +311,11 @@ export const heartbeat = async (user: SessionUser, attemptId: string) => {
 export const saveScratchpad = async (user: SessionUser, attemptId: string, text: string) => {
   const attempt = await ownAttempt(attemptId, user)
   if (attempt.candidateId.toString() !== user.id) throw new HttpError(403, 'Only the sitting candidate can use the scratchpad')
+  if (attempt.status !== 'in_progress') throw new HttpError(409, 'This attempt is already finalized')
+  if (isPastDeadline(attempt.deadlineAt)) {
+    await finalizeAttempt(attempt.id, 'expired')
+    throw new HttpError(409, 'The deadline has passed. Scratchpad cannot be updated.')
+  }
   await Scratchpad.findOneAndUpdate(
     { attemptId },
     { $set: { text, updatedAt: new Date() } },
@@ -294,6 +331,9 @@ export const recordIncident = async (
   note = '',
 ) => {
   const attempt = await ownAttempt(attemptId, user)
+  if (attempt.candidateId.toString() !== user.id) {
+    throw new HttpError(403, 'Only the sitting candidate can record attempt incidents')
+  }
   if (attempt.status !== 'in_progress') return { recorded: false }
   await Incident.create({
     attemptId: attempt._id,

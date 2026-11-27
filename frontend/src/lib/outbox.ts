@@ -3,6 +3,7 @@ export type OutboxItem = {
   choiceIds?: string[]
   text?: string
   flaggedForReview?: boolean
+  expectedVersion?: number
 }
 
 const key = (attemptId: string) => `holdfast-outbox:${attemptId}`

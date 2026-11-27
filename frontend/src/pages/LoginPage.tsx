@@ -13,10 +13,12 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
+    setPending(true)
     try {
       const user = await apiRequest<SessionUser>('/auth/login', {
         method: 'POST',
@@ -26,6 +28,8 @@ export function LoginPage() {
       await navigate({ to: homeFor(user.role) })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not sign in')
+    } finally {
+      setPending(false)
     }
   }
 
@@ -46,8 +50,8 @@ export function LoginPage() {
           <Field label="Password">
             <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </Field>
-          <Button type="submit">
-            <LogIn size={16} /> Enter
+          <Button type="submit" disabled={pending}>
+            <LogIn size={16} /> {pending ? 'Signing in…' : 'Enter'}
           </Button>
         </form>
       </section>

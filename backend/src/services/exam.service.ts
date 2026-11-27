@@ -382,6 +382,9 @@ export const updateQuestion = async (
   if (user.role === 'candidate') throw new HttpError(403, 'You do not have permission to do that')
   const question = await Question.findById(questionId)
   if (!question) throw new HttpError(404, 'Question not found')
+  if (user.role !== 'admin' && question.authorId.toString() !== user.id) {
+    throw new HttpError(403, 'You can only edit your own questions')
+  }
   const links = await ExamQuestion.find({ questionId }).select('examId')
   if (links.length > 0) {
     const started = await Exam.exists({
@@ -421,15 +424,20 @@ export const updateQuestion = async (
 
 export const deleteQuestion = async (user: SessionUser, questionId: string) => {
   if (user.role === 'candidate') throw new HttpError(403, 'You do not have permission to do that')
+  const question = await Question.findById(questionId)
+  if (!question) throw new HttpError(404, 'Question not found')
+  if (user.role !== 'admin' && question.authorId.toString() !== user.id) {
+    throw new HttpError(403, 'You can only delete your own questions')
+  }
   const assigned = await ExamQuestion.exists({ questionId })
   if (assigned) throw new HttpError(400, 'Remove this question from examinations before deleting it')
-  const result = await Question.deleteOne({ _id: questionId })
-  if (result.deletedCount === 0) throw new HttpError(404, 'Question not found')
+  await Question.deleteOne({ _id: questionId })
 }
 
 export const listQuestions = async (user: SessionUser) => {
   if (user.role === 'candidate') throw new HttpError(403, 'You do not have permission to do that')
-  const questions = await Question.find().sort({ updatedAt: -1 })
+  const filter = user.role === 'admin' ? {} : { authorId: user.id }
+  const questions = await Question.find(filter).sort({ updatedAt: -1 })
   return questions.map(serializeQuestion)
 }
 
@@ -437,6 +445,9 @@ export const getQuestion = async (user: SessionUser, questionId: string) => {
   if (user.role === 'candidate') throw new HttpError(403, 'You do not have permission to do that')
   const question = await Question.findById(questionId)
   if (!question) throw new HttpError(404, 'Question not found')
+  if (user.role !== 'admin' && question.authorId.toString() !== user.id) {
+    throw new HttpError(403, 'You can only view your own questions')
+  }
   return serializeQuestion(question)
 }
 
