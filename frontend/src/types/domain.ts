@@ -49,6 +49,7 @@ export type CandidateExam = ExamSummary & {
   reason: string
   attemptId: string | null
   attemptStatus: string | null
+  resultsReady: boolean
 }
 
 export type AttemptQuestion = {

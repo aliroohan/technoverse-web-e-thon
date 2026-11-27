@@ -43,10 +43,13 @@ export function CandidateHomePage() {
                         <Play size={15} /> {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
                       </Button>
                     )}
-                    {exam.access === 'completed' && exam.resultsPublished && exam.attemptId && (
+                    {exam.access === 'completed' && exam.resultsReady && exam.attemptId && (
                       <Link className="btn-ghost" to="/candidate/results/$attemptId" params={{ attemptId: exam.attemptId }}>
                         <Eye size={15} /> View result
                       </Link>
+                    )}
+                    {exam.access === 'completed' && exam.resultsPublished && !exam.resultsReady && (
+                      <p className="meta" style={{ margin: 0 }}>Your result stays hidden until the written answers are marked.</p>
                     )}
                   </div>
                 </li>

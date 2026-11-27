@@ -12,7 +12,7 @@ import {
 import { HttpError } from '../lib/http-error.js'
 import type { SessionUser } from '../types/domain.js'
 import { publicExam } from './exam.service.js'
-import { publishResults, recomputeWritten } from './grading.service.js'
+import { issueCode, publishResults, recomputeWritten } from './grading.service.js'
 import { round2 } from './marking.js'
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -278,6 +278,8 @@ export const updateAdminAttemptResult = async (
 
   await attempt.save()
   const updated = await recomputeWritten(attemptId)
+  const exam = await Exam.findById(attempt.examId)
+  if (exam?.resultsPublished && updated.gradingStatus === 'ready') await issueCode(attemptId)
   return {
     attemptId: updated.id,
     objectiveScore: updated.objectiveScore,

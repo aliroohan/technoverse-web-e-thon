@@ -67,6 +67,8 @@ export const listGrading = async (user: SessionUser, examId: string) => {
   const byId = new Map(candidates.map((candidate) => [candidate._id.toString(), candidate]))
   const grades = await Grade.find({ attemptId: { $in: attempts.map((attempt) => attempt._id) } })
   const answers = await Answer.find({ attemptId: { $in: attempts.map((attempt) => attempt._id) } })
+  const verifications = await ReportVerification.find({ attemptId: { $in: attempts.map((attempt) => attempt._id) } })
+  const codeByAttempt = new Map(verifications.map((row) => [row.attemptId.toString(), row.code]))
 
   return {
     examId,
@@ -85,6 +87,7 @@ export const listGrading = async (user: SessionUser, examId: string) => {
       totalScore: attempt.totalScore,
       totalMarks: attempt.questionSnapshots.reduce((sum, item) => sum + item.marks, 0),
       submittedAt: attempt.submittedAt,
+      verificationCode: exam.resultsPublished ? (codeByAttempt.get(attempt._id.toString()) ?? null) : null,
       questions: attempt.questionSnapshots.map((snapshot) => ({
         questionId: snapshot.questionId,
         stem: snapshot.stem,
@@ -117,7 +120,7 @@ export const gradeWritten = async (
 ) => {
   const attempt = await Attempt.findById(attemptId)
   if (!attempt || attempt.isSandbox) throw new HttpError(404, 'Attempt not found')
-  await loadOwnedExam(attempt.examId.toString(), user)
+  const exam = await loadOwnedExam(attempt.examId.toString(), user)
   if (attempt.status === 'in_progress') throw new HttpError(400, 'This attempt is still in progress')
   const snapshot = attempt.questionSnapshots.find((item) => item.questionId === questionId)
   if (!snapshot || snapshot.type !== 'written') throw new HttpError(400, 'That question is not a written response')
@@ -129,7 +132,8 @@ export const gradeWritten = async (
     { $set: { awardedMarks, comment, graderId: user.id } },
     { upsert: true },
   )
-  await recomputeWritten(attemptId)
+  const updated = await recomputeWritten(attemptId)
+  if (exam.resultsPublished && updated.gradingStatus === 'ready') await issueCode(attemptId)
   return listGrading(user, attempt.examId.toString())
 }
 

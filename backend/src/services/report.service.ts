@@ -4,7 +4,7 @@ import { Answer, Attempt, Exam, Grade, ReportVerification, User } from '../model
 import { HttpError } from '../lib/http-error.js'
 import type { SessionUser } from '../types/domain.js'
 import { issueCode } from './grading.service.js'
-import { scoreObjective } from './marking.js'
+import { scoreObjective, writtenAwaitingMark } from './marking.js'
 
 const pdfBuffer = (draw: (doc: InstanceType<typeof PDFDocument>) => void) =>
   new Promise<Buffer>((resolve, reject) => {
@@ -26,12 +26,14 @@ export const reportPdf = async (user: SessionUser, attemptId: string) => {
   if (!exam) throw new HttpError(404, 'Report not found')
   const isExaminer = user.role !== 'candidate' && (user.role === 'admin' || exam.examinerId.toString() === user.id)
   const isSelf = attempt.candidateId.toString() === user.id
-  if (!isExaminer && !(isSelf && exam.resultsPublished)) throw new HttpError(404, 'Report not found')
+  if (!isExaminer && !(isSelf && exam.resultsPublished && !writtenAwaitingMark(attempt))) {
+    throw new HttpError(404, 'Report not found')
+  }
 
   const candidate = await User.findById(attempt.candidateId)
   const answers = await Answer.find({ attemptId })
   const grades = await Grade.find({ attemptId })
-  const code = exam.resultsPublished ? await issueCode(attempt.id) : null
+  const code = exam.resultsPublished && !writtenAwaitingMark(attempt) ? await issueCode(attempt.id) : null
 
   const buffer = await pdfBuffer((doc) => {
     doc.fontSize(22).text('Holdfast result report', { align: 'left' })
@@ -45,7 +47,7 @@ export const reportPdf = async (user: SessionUser, attemptId: string) => {
     doc.text(`Candidate: ${candidate?.name ?? 'Candidate'}`)
     doc.text(`Score: ${attempt.totalScore} / ${attempt.questionSnapshots.reduce((sum, item) => sum + item.marks, 0)}`)
     doc.text(`Submitted: ${attempt.submittedAt?.toISOString() ?? '—'}`)
-    if (code) doc.text(`Verification code: ${code}`)
+    if (code) doc.text(`Verify: /verify/${code}`)
     doc.moveDown()
     doc.fontSize(12).text('Questions')
     doc.moveDown(0.4)
@@ -77,10 +79,14 @@ export const verifyReport = async (code: string) => {
   if (!row) throw new HttpError(404, 'No report matches that code')
   const attempt = await Attempt.findById(row.attemptId)
   const exam = attempt ? await Exam.findById(attempt.examId) : null
-  if (!attempt || !exam) throw new HttpError(404, 'No report matches that code')
+  if (!attempt || !exam || !exam.resultsPublished || writtenAwaitingMark(attempt)) {
+    throw new HttpError(404, 'No report matches that code')
+  }
+  const candidate = await User.findById(attempt.candidateId)
   const totalMarks = attempt.questionSnapshots.reduce((sum, item) => sum + item.marks, 0)
   return {
     examTitle: exam.title,
+    candidateName: candidate?.name ?? 'Candidate',
     totalScore: attempt.totalScore,
     totalMarks,
     issuedAt: row.issuedAt,

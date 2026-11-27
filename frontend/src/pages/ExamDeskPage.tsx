@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { CandidateForm, CandidateImport, type DirectoryPerson } from '../components/CandidateTools'
+import { VerifyShare } from '../components/VerifyShare'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
 import { Banner, Button, Dialog, Drawer, Field, TextInput, Area } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
@@ -52,6 +53,7 @@ type Grading = {
     gradingStatus: string | null
     totalScore: number
     totalMarks: number
+    verificationCode: string | null
     questions: {
       questionId: string
       stem: string
@@ -649,6 +651,12 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
             <strong>{attempt.candidateName}</strong>
             <span>{attempt.totalScore} / {attempt.totalMarks} · {attempt.gradingStatus}</span>
           </div>
+          {attempt.gradingStatus === 'pending_subjective' && (
+            <p className="meta" style={{ margin: 0 }}>This result stays hidden until the written answers are marked.</p>
+          )}
+          {grading.data?.resultsPublished && attempt.gradingStatus === 'ready' && attempt.verificationCode && (
+            <VerifyShare code={attempt.verificationCode} />
+          )}
           {attempt.questions.filter((question) => question.type === 'written').map((question) => (
             <WrittenMark key={question.questionId} examId={examId} attemptId={attempt.id} question={question} existing={attempt.grades.find((grade) => grade.questionId === question.questionId)} />
           ))}

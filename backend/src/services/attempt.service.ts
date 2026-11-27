@@ -6,7 +6,7 @@ import { loadOwnedExam } from './access.js'
 import { computeDeadline, isPastDeadline } from './deadline.js'
 import { asSettings } from './exam.service.js'
 import { lifecycleOf } from './lifecycle.js'
-import { scoreObjective } from './marking.js'
+import { scoreObjective, writtenAwaitingMark } from './marking.js'
 import { buildSnapshots } from './paper.js'
 import { toCandidateQuestion } from './serializers.js'
 
@@ -75,7 +75,7 @@ const presentAttempt = async (attempt: NonNullable<Awaited<ReturnType<typeof own
   const scratchpad = await Scratchpad.findOne({ attemptId: attempt._id })
   const announcements = await Announcement.find({ examId: attempt.examId }).sort({ createdAt: 1 })
   const includeKeys = user.role !== 'candidate' && attempt.candidateId.toString() !== user.id
-  const showResults = exam.resultsPublished || includeKeys
+  const showResults = (exam.resultsPublished && !writtenAwaitingMark(attempt)) || includeKeys
 
   return {
     id: attempt._id.toString(),
