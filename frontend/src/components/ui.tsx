@@ -1,5 +1,21 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ChangeEvent,
+  type CSSProperties,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react'
+import { createPortal } from 'react-dom'
 
 export function Button({
   variant = 'solid',
@@ -35,8 +51,147 @@ export function Area(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} />
 }
 
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} />
+type SelectOption = {
+  value: string
+  label: string
+  disabled?: boolean
+}
+
+function readOptions(children: ReactNode): SelectOption[] {
+  const items: SelectOption[] = []
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement<{ value?: string | number; disabled?: boolean; children?: ReactNode }>(child)) continue
+    if (child.type !== 'option') continue
+    const rawLabel = Children.toArray(child.props.children)
+      .map((part) => (typeof part === 'string' || typeof part === 'number' ? String(part) : ''))
+      .join('')
+    const val = child.props.value !== undefined ? String(child.props.value) : rawLabel
+    items.push({
+      value: val,
+      label: rawLabel || val,
+      disabled: Boolean(child.props.disabled),
+    })
+  }
+  return items
+}
+
+export function Select({
+  children,
+  className,
+  value,
+  defaultValue,
+  onChange,
+  disabled,
+  id,
+  name,
+  'aria-label': ariaLabel,
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  const options = readOptions(children)
+  const [internal, setInternal] = useState(() =>
+    defaultValue !== undefined ? String(defaultValue) : (options[0]?.value ?? ''),
+  )
+  const [open, setOpen] = useState(false)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLUListElement>(null)
+  const currentValue = value !== undefined ? String(value) : internal
+  const selected = options.find((opt) => opt.value === currentValue) ?? options[0]
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return
+    const updatePosition = () => {
+      if (!triggerRef.current) return
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUp = spaceBelow < 220 && rect.top > spaceBelow
+      setMenuStyle({
+        position: 'fixed',
+        left: rect.left,
+        minWidth: rect.width,
+        ...(openUp ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+      })
+    }
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  const choose = (nextValue: string) => {
+    if (value === undefined) setInternal(nextValue)
+    setOpen(false)
+    if (onChange) {
+      onChange({
+        target: { value: nextValue, name: name ?? '' },
+        currentTarget: { value: nextValue, name: name ?? '' },
+      } as ChangeEvent<HTMLSelectElement>)
+    }
+  }
+
+  return (
+    <div ref={rootRef} className={['select-box', className].filter(Boolean).join(' ')}>
+      <button
+        ref={triggerRef}
+        id={id}
+        type="button"
+        className="select-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span className="select-value">{selected?.label ?? ''}</span>
+        <ChevronDown size={15} className={`select-chevron${open ? ' open' : ''}`} aria-hidden="true" />
+      </button>
+      {open &&
+        createPortal(
+          <ul ref={menuRef} className="select-menu" style={menuStyle} role="listbox" aria-label={ariaLabel}>
+            {options.map((option) => {
+              const isSelected = option.value === currentValue
+              return (
+                <li key={`${option.value}-${option.label}`} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={option.disabled}
+                    className={`select-option${isSelected ? ' selected' : ''}`}
+                    onClick={() => choose(option.value)}
+                  >
+                    <span>{option.label}</span>
+                    {isSelected && <Check size={14} className="select-check" aria-hidden="true" />}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>,
+          document.body,
+        )}
+    </div>
+  )
 }
 
 export function Banner({ tone = 'info', children }: { tone?: 'info' | 'error' | 'ok'; children: ReactNode }) {
@@ -71,7 +226,9 @@ export function Dialog({
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="dialog-head">
           <h2 id={titleId}>{title}</h2>
-          <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
+          <Button type="button" variant="ghost" className="btn-icon" aria-label="Close" title="Close" onClick={onClose}>
+            <X size={16} />
+          </Button>
         </div>
         {children}
       </div>
@@ -105,7 +262,9 @@ export function Drawer({
       <aside className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="sheet-head">
           <h2 id={titleId}>{title}</h2>
-          <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
+          <Button type="button" variant="ghost" className="btn-icon" aria-label="Close" title="Close" onClick={onClose}>
+            <X size={16} />
+          </Button>
         </header>
         <div className="sheet-body">{children}</div>
         {footer && <footer className="sheet-foot">{footer}</footer>}
@@ -129,7 +288,7 @@ export function Pagination({
 }) {
   if (total === 0) return null
   return (
-    <div className="row" style={{ justifyContent: 'space-between', marginTop: '1rem' }} aria-label="Pagination">
+    <div className="row" style={{ justifyContent: 'space-between', marginTop: '0.5rem' }} aria-label="Pagination">
       <span className="meta">
         Page {page} of {totalPages} · {total} {label}
       </span>
