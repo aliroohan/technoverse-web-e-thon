@@ -24,7 +24,7 @@ import { useState, type ReactNode } from 'react'
 import { CandidateForm, CandidateImport, type DirectoryPerson } from '../components/CandidateTools'
 import { VerifyShare } from '../components/VerifyShare'
 import { QuestionForm, emptyQuestion, questionPayload, questionToDraft } from '../components/QuestionForm'
-import { Banner, Button, Dialog, Drawer, Field, TextInput, Area } from '../components/ui'
+import { Banner, Button, Dialog, Drawer, Field, Loader, TextInput, Area } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen, toDateTimeLocal } from '../lib/format'
 import type { ExamSummary, Question } from '../types/domain'
@@ -130,7 +130,7 @@ export function ExamDeskPage() {
     await queryClient.invalidateQueries({ queryKey: ['exam', examId] })
   }
 
-  if (desk.isPending) return <p className="meta">Loading…</p>
+  if (desk.isPending) return <Loader label="Loading examination desk" />
   if (desk.isError || !desk.data) {
     return (
       <section className="stack">
@@ -290,12 +290,12 @@ function Setup({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promise
       )}
       {locked && <p className="meta">Settings locked after publish; close time can still be extended.</p>}
       <div className="row">
-        <Button type="button" disabled={saving || publishing} onClick={() => void save()}>
-          <Check size={15} /> {saving ? 'Saving…' : 'Save'}
+        <Button type="button" loading={saving} disabled={publishing} onClick={() => void save()}>
+          <Check size={15} /> Save
         </Button>
         {exam.publication === 'draft' && (
-          <Button type="button" variant="ghost" disabled={saving || publishing} onClick={() => void publish()}>
-            <Send size={15} /> {publishing ? 'Publishing…' : 'Publish'}
+          <Button type="button" variant="ghost" loading={publishing} disabled={saving} onClick={() => void publish()}>
+            <Send size={15} /> Publish
           </Button>
         )}
       </div>
@@ -460,12 +460,12 @@ function Questions({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Pro
           title="Questions"
           onClose={() => setBankOpen(false)}
           footer={
-            <Button type="button" disabled={adding || selected.length === 0} onClick={() => void addSelected()}>
-              {adding ? 'Adding…' : selected.length === 1 ? 'Add 1 question' : `Add ${selected.length} questions`}
+            <Button type="button" loading={adding} disabled={selected.length === 0} onClick={() => void addSelected()}>
+              {selected.length === 1 ? 'Add 1 question' : `Add ${selected.length} questions`}
             </Button>
           }
         >
-          {bank.isLoading && <p className="meta">Loading questions…</p>}
+          {bank.isLoading && <Loader label="Loading questions" />}
           {bank.data?.length === 0 && <p className="meta">The bank is empty. Create a question first.</p>}
           {bank.data?.map((question) => {
             const taken = onPaper.has(question.id)
@@ -594,8 +594,8 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
           onClose={() => setOpen(false)}
           footer={
             panel === 'list' ? (
-              <Button type="button" disabled={enrolling || selected.length === 0} onClick={() => void enroll()}>
-                {enrolling ? 'Enrolling…' : selected.length === 1 ? 'Enroll 1' : `Enroll ${selected.length}`}
+              <Button type="button" loading={enrolling} disabled={selected.length === 0} onClick={() => void enroll()}>
+                {selected.length === 1 ? 'Enroll 1' : `Enroll ${selected.length}`}
               </Button>
             ) : undefined
           }
@@ -631,7 +631,7 @@ function People({ exam, onSaved, onNotice }: { exam: Desk; onSaved: () => Promis
           {panel === 'list' && (
             <>
               {users.error && <Banner tone="error">{users.error.message}</Banner>}
-              {users.isLoading && <p className="meta">Loading candidates…</p>}
+              {users.isLoading && <Loader label="Loading candidates" />}
               {users.data?.length === 0 && <p className="meta">No candidates yet. Add one, or import a file.</p>}
               {users.data?.map((person) => {
                 const taken = enrolled.has(person.id)
@@ -689,7 +689,7 @@ function Monitor({ examId }: { examId: string }) {
               : 'Could not load monitoring data.'}
         </Banner>
       )}
-      {roster.isPending && <p className="meta">Loading live roster…</p>}
+      {roster.isPending && <Loader label="Loading live roster" />}
       <ul className="list">
         {roster.data?.map((row) => (
           <li className="card" key={row.attemptId}>
@@ -718,7 +718,7 @@ function Monitor({ examId }: { examId: string }) {
         }}
       >
         <TextInput aria-label="Announcement" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Announcement to the room" />
-        <Button type="submit" disabled={sending || !body.trim()}><Send size={15} /> {sending ? 'Sending…' : 'Send'}</Button>
+        <Button type="submit" loading={sending} disabled={!body.trim()}><Send size={15} /> Send</Button>
       </form>
       <ul className="list">
         {incidents.data?.incidents.map((incident) => (
@@ -750,7 +750,7 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
 
   return (
     <div className="stack">
-      {grading.isPending && <p className="meta">Loading submissions…</p>}
+      {grading.isPending && <Loader label="Loading submissions" />}
       {grading.isError && (
         <Banner tone="error">
           {grading.error instanceof Error ? grading.error.message : 'Could not load grading data.'}
@@ -760,9 +760,10 @@ function Marking({ examId, onNotice }: { examId: string; onNotice: (value: strin
         <Button
           type="button"
           onClick={() => void publish()}
-          disabled={publishing || !grading.data || grading.data.resultsPublished || !grading.data.canPublishResults}
+          loading={publishing}
+          disabled={!grading.data || grading.data.resultsPublished || !grading.data.canPublishResults}
         >
-          {publishing ? 'Publishing…' : grading.data?.resultsPublished ? 'Results are published' : 'Publish results'}
+          {grading.data?.resultsPublished ? 'Results are published' : 'Publish results'}
         </Button>
         {!grading.data?.resultsPublished && grading.data?.publishBlockReason && (
           <p className="meta">{grading.data.publishBlockReason}</p>
@@ -835,7 +836,7 @@ function WrittenMark({
         <TextInput value={comment} onChange={(event) => setComment(event.target.value)} />
       </Field>
       {error && <Banner tone="error">{error}</Banner>}
-      <Button type="submit" variant="ghost" disabled={saving}>{saving ? 'Saving…' : 'Save mark'}</Button>
+      <Button type="submit" variant="ghost" loading={saving}>Save mark</Button>
     </form>
   )
 }
@@ -848,7 +849,7 @@ function Insights({ examId }: { examId: string }) {
 
   return (
     <div className="stack">
-      {(analytics.isPending || questions.isPending) && <p className="meta">Loading insights…</p>}
+      {(analytics.isPending || questions.isPending) && <Loader label="Loading insights" />}
       {(analytics.isError || questions.isError) && (
         <Banner tone="error">
           {analytics.error instanceof Error

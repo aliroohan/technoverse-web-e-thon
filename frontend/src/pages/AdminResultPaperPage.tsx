@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { VerifyShare } from '../components/VerifyShare'
-import { Area, Banner, Button, Field, Pagination, TextInput } from '../components/ui'
+import { Area, Banner, Button, Field, Loader, Pagination, TextInput } from '../components/ui'
 import { apiRequest, downloadPdf, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 import type { ExamSummary } from '../types/domain'
@@ -125,7 +125,7 @@ export function AdminResultPaperPage() {
     onError: (error: Error) => notifyError(error.message),
   })
 
-  if (detail.isPending) return <p className="meta">Loading…</p>
+  if (detail.isPending) return <Loader label="Loading paper details" />
   if (detail.error || !detail.data) {
     return <Banner tone="error">{detail.error?.message ?? 'Could not load question paper.'}</Banner>
   }
@@ -162,7 +162,7 @@ export function AdminResultPaperPage() {
         <Button
           type="button"
           variant={exam.resultsPublished ? 'ghost' : 'solid'}
-          disabled={togglePublication.isPending}
+          loading={togglePublication.isPending}
           onClick={() => togglePublication.mutate(!exam.resultsPublished)}
         >
           {exam.resultsPublished ? <EyeOff size={15} /> : <Send size={15} />}
@@ -535,9 +535,8 @@ function ManageStudentResultPanel({
 
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div className="row">
-          <Button type="submit" disabled={saving}>
-            <Check size={15} />
-            {saving ? 'Saving…' : 'Save'}
+          <Button type="submit" loading={saving}>
+            <Check size={15} /> Save
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel

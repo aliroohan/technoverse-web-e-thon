@@ -288,7 +288,7 @@ export function ScratchpadDrawer({
               <FileText size={13} /> Notes
             </button>
           </div>
-          <button type="button" className="btn-icon" aria-label="Close scratchpad" onClick={onClose}>
+          <button type="button" className="btn-ghost btn-icon" aria-label="Close scratchpad" onClick={onClose}>
             <X size={16} />
           </button>
         </div>

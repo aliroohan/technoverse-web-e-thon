@@ -15,7 +15,7 @@ import {
   Shuffle,
 } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
-import { Banner, Button, Dialog, Field, Select, TextInput, Area } from '../components/ui'
+import { Banner, Button, Dialog, Field, Loader, Select, TextInput, Area } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
 import { formatWhen, toDateTimeLocal } from '../lib/format'
 import type { ExamSummary } from '../types/domain'
@@ -178,7 +178,7 @@ export function ExamListPage() {
         </Select>
       </div>
 
-      {exams.isPending && <p className="meta">Loading…</p>}
+      {exams.isPending && <Loader label="Loading examinations" />}
       {exams.error && <Banner tone="error">{exams.error.message}</Banner>}
 
       {exams.data && filtered.length === 0 ? (
@@ -293,7 +293,7 @@ export function ExamListPage() {
                 />
               </Field>
             </div>
-            <Button type="submit" block disabled={create.isPending}>
+            <Button type="submit" block loading={create.isPending}>
               <Plus size={15} /> Create draft
             </Button>
             {create.error && <p className="banner error">{create.error.message}</p>}

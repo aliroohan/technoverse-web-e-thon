@@ -16,7 +16,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Banner, Button, Field, TextInput } from '../components/ui'
+import { Banner, Button, Field, Loader, TextInput } from '../components/ui'
 import { apiRequest, downloadPdf, notifyError, notifySuccess } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
@@ -81,7 +81,7 @@ export function ExaminerStudentPage() {
     await queryClient.invalidateQueries({ queryKey: ['examiner-students'] })
   }
 
-  if (detail.isPending) return <p className="meta">Loading…</p>
+  if (detail.isPending) return <Loader label="Loading student record" />
   if (detail.error || !detail.data) {
     return <Banner tone="error">{detail.error?.message ?? 'Could not load student.'}</Banner>
   }
@@ -465,7 +465,7 @@ function WrittenQuestionChecker({
 
       {canGrade && (
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <Button type="submit" className="btn-sm" disabled={saving}>
+          <Button type="submit" className="btn-sm" loading={saving}>
             <Check size={14} /> Save
           </Button>
         </div>

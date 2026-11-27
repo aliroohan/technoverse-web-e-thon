@@ -3,7 +3,7 @@ import { Link, useParams } from '@tanstack/react-router'
 import { ArrowLeft, Award, Clock, FileDown, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { VerifyShare } from '../components/VerifyShare'
-import { Banner, Button } from '../components/ui'
+import { Banner, Button, Loader } from '../components/ui'
 import { apiRequest, downloadPdf } from '../lib/api-client'
 import { formatWhen } from '../lib/format'
 
@@ -30,7 +30,7 @@ export function ResultPage() {
     queryFn: () => apiRequest<Result>(`/results/${attemptId}`),
   })
 
-  if (result.isPending) return <p className="meta">Loading…</p>
+  if (result.isPending) return <Loader label="Loading result" />
   if (result.error) {
     return (
       <section className="stack">
@@ -92,8 +92,8 @@ export function ResultPage() {
         ))}
       </ul>
       {pdfError && <Banner tone="error">{pdfError}</Banner>}
-      <Button type="button" disabled={downloading} onClick={() => void onDownload()}>
-        <FileDown size={15} /> {downloading ? 'Downloading…' : 'Download PDF'}
+      <Button type="button" loading={downloading} onClick={() => void onDownload()}>
+        <FileDown size={15} /> Download PDF
       </Button>
     </article>
   )

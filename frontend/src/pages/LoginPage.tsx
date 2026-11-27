@@ -245,8 +245,8 @@ export function LoginPage() {
             </div>
           </Field>
 
-          <Button type="submit" block disabled={pending}>
-            <LogIn size={16} /> {pending ? 'Logging in…' : 'Log in'}
+          <Button type="submit" block loading={pending}>
+            <LogIn size={16} /> Log in
           </Button>
 
           <div className="login-card-foot">
