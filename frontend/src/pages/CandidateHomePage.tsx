@@ -56,8 +56,9 @@ export function CandidateHomePage() {
                       <Button
                         type="button"
                         loading={start.isPending && start.variables === exam.id}
-                        disabled={start.isPending}
-                        onClick={() => start.mutate(exam.id)}
+                        onClick={() => {
+                          if (!start.isPending) start.mutate(exam.id)
+                        }}
                       >
                         <Play size={15} /> {exam.attemptStatus === 'in_progress' ? 'Resume' : 'Enter'}
                       </Button>

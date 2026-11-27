@@ -17,7 +17,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
-export function Spinner({ size = 16 }: { size?: number }) {
+export function Spinner({ size = 18 }: { size?: number }) {
   return (
     <svg
       className="spinner-icon"
@@ -27,8 +27,13 @@ export function Spinner({ size = 16 }: { size?: number }) {
       fill="none"
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeOpacity="0.22" strokeWidth="2.5" />
-      <path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9.25" stroke="currentColor" strokeOpacity="0.24" strokeWidth="2.6" />
+      <path
+        d="M12 2.75A9.25 9.25 0 1 1 3.98 16.62"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
@@ -37,7 +42,7 @@ export function Loader({ label = 'Loading', full = false }: { label?: string; fu
   return (
     <div className={full ? 'loader-stage full' : 'loader-stage'} role="status" aria-label={label}>
       <span className="sr-only">{label}</span>
-      <div className={full ? 'loader-halo' : undefined}>
+      <div className={full ? 'loader-halo full' : 'loader-halo'}>
         <div className="loader-orb" aria-hidden="true">
           <span className="loader-ring-outer" />
           <span className="loader-ring-inner" />
@@ -70,7 +75,7 @@ export function Button({
       <span className="btn-content">{children}</span>
       {loading && (
         <span className="btn-spinner" aria-hidden="true">
-          <Spinner size={16} />
+          <Spinner size={18} />
         </span>
       )}
     </button>
