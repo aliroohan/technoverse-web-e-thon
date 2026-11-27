@@ -1,10 +1,23 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { AlertCircle, BookOpen, CheckCircle2, ChevronRight, FileText, Search, Upload, UserPlus, Users, X } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowUpRight,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Search,
+  Upload,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { CandidateForm, CandidateImport, type CandidateImportResult } from '../components/CandidateTools'
 import { Banner, Button, Select, TextInput } from '../components/ui'
 import { apiRequest } from '../lib/api-client'
+import { formatWhen } from '../lib/format'
 
 type ExaminerStudentRow = {
   id: string
@@ -69,15 +82,6 @@ export function CandidatesPage() {
       <div className="admin-header">
         <div>
           <h1 className="page-title">Candidates</h1>
-          <div className="meta-row">
-            <span className="meta-chip" title="Total candidates"><Users size={14} /> {totals.students}</span>
-            <span className="meta-chip" title="Attended papers"><FileText size={14} /> {totals.attended}</span>
-            {totals.unchecked > 0 && (
-              <span className="pill warn meta-chip" title="Unchecked papers">
-                <AlertCircle size={13} /> {totals.unchecked}
-              </span>
-            )}
-          </div>
         </div>
         {panel === 'closed' && (
           <div className="row">
@@ -100,6 +104,30 @@ export function CandidatesPage() {
             </Button>
           </div>
         )}
+      </div>
+
+      <div className="stat-strip">
+        <div className="stat-tile">
+          <div>
+            <div className="stat-value">{totals.students}</div>
+            <div className="stat-label">Candidates</div>
+          </div>
+          <span className="stat-icon" aria-hidden="true"><Users size={18} /></span>
+        </div>
+        <div className="stat-tile ok">
+          <div>
+            <div className="stat-value">{totals.attended}</div>
+            <div className="stat-label">Attended</div>
+          </div>
+          <span className="stat-icon" aria-hidden="true"><CheckCircle2 size={18} /></span>
+        </div>
+        <div className={totals.unchecked > 0 ? 'stat-tile warn' : 'stat-tile'}>
+          <div>
+            <div className="stat-value">{totals.unchecked}</div>
+            <div className="stat-label">Unchecked</div>
+          </div>
+          <span className="stat-icon" aria-hidden="true"><AlertCircle size={18} /></span>
+        </div>
       </div>
 
       {notice && <Banner>{notice}</Banner>}
@@ -176,46 +204,77 @@ export function CandidatesPage() {
       {people.data && filtered.length === 0 ? (
         <Banner>No students found.</Banner>
       ) : (
-        <ul className="list">
-          {filtered.map((person) => (
-            <li className="card" key={person.id}>
-              <Link
-                to="/examiner/candidates/$candidateId"
-                params={{ candidateId: person.id }}
-                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-              >
-                <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <div className="row" style={{ gap: '0.8rem' }}>
-                    <span className="student-avatar" aria-hidden="true">
-                      {initialsOf(person.name)}
-                    </span>
-                    <div>
-                      <strong style={{ fontSize: '1.02rem' }}>{person.name}</strong>
-                      <div className="meta">{person.email}</div>
+        <ul className="student-grid">
+          {filtered.map((person) => {
+            const avatarTone =
+              person.uncheckedCount > 0 ? 'student-avatar warn' : person.attendedCount > 0 ? 'student-avatar ok' : 'student-avatar'
+            return (
+              <li className="dossier-card" key={person.id}>
+                <Link
+                  to="/examiner/candidates/$candidateId"
+                  params={{ candidateId: person.id }}
+                  className="dossier-link"
+                >
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+                    <div className="row" style={{ gap: '0.75rem', flexWrap: 'nowrap', minWidth: 0 }}>
+                      <span className={avatarTone} aria-hidden="true">
+                        {initialsOf(person.name)}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ fontSize: '1.05rem', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {person.name}
+                        </strong>
+                        <span className="meta" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {person.email}
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowUpRight size={17} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} aria-hidden="true" />
+                  </div>
+
+                  <div className="dossier-stats">
+                    <div className="dossier-stat">
+                      <span className="dossier-stat-val">
+                        <BookOpen size={13} style={{ color: 'var(--ink-soft)' }} /> {person.enrolledCount}
+                      </span>
+                      <span className="dossier-stat-key">Enrolled</span>
+                    </div>
+                    <div className="dossier-stat">
+                      <span className="dossier-stat-val">
+                        <FileText size={13} style={{ color: 'var(--pine)' }} /> {person.attendedCount}
+                      </span>
+                      <span className="dossier-stat-key">Attended</span>
+                    </div>
+                    <div className="dossier-stat">
+                      <span
+                        className="dossier-stat-val"
+                        style={{ color: person.uncheckedCount > 0 ? 'var(--brass)' : 'var(--ink-soft)' }}
+                      >
+                        {person.uncheckedCount > 0 ? (
+                          <AlertCircle size={13} />
+                        ) : (
+                          <CheckCircle2 size={13} style={{ color: person.attendedCount > 0 ? 'var(--pine)' : 'var(--ink-soft)' }} />
+                        )}
+                        {person.uncheckedCount}
+                      </span>
+                      <span className="dossier-stat-key">Pending</span>
                     </div>
                   </div>
-                  <div className="row" style={{ gap: '0.75rem' }}>
-                    <span className="meta-chip meta" title={`${person.enrolledCount} enrolled`}>
-                      <BookOpen size={14} /> {person.enrolledCount}
-                    </span>
-                    <span className="meta-chip meta" title={`${person.attendedCount} attended`}>
-                      <FileText size={14} /> {person.attendedCount}
+
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <span className="meta-chip meta" style={{ fontSize: '0.82rem' }}>
+                      <Clock size={12} /> {person.latestActivityAt ? formatWhen(person.latestActivityAt) : '—'}
                     </span>
                     {person.uncheckedCount > 0 ? (
-                      <span className="pill warn meta-chip" title={`${person.uncheckedCount} unchecked`}>
-                        <AlertCircle size={13} /> {person.uncheckedCount}
-                      </span>
+                      <span className="pill warn">review</span>
                     ) : person.attendedCount > 0 ? (
-                      <span className="pill ok meta-chip" title="Checked" aria-label="Checked">
-                        <CheckCircle2 size={13} />
-                      </span>
+                      <span className="pill ok">checked</span>
                     ) : null}
-                    <ChevronRight size={17} style={{ color: 'var(--ink-soft)' }} aria-hidden="true" />
                   </div>
-                </div>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
